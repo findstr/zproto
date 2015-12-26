@@ -159,7 +159,7 @@ encode_table(lua_State *L, struct zproto_buffer *zb, struct zproto_record *proto
         struct zproto_field *last = NULL;
         struct zproto_field *field;
         int nr = 0;
-        int32_t *field_nr = zproto_encode_record(zb);
+        int32_t field_nr = zproto_encode_record(zb);
         for (field = zproto_field(z, proto); field; field = field->next) {
                 lua_getfield(L, -1, field->name);
                 if (lua_type(L, -1) == LUA_TNIL) {
@@ -180,7 +180,8 @@ encode_table(lua_State *L, struct zproto_buffer *zb, struct zproto_record *proto
                 last = field;
                 ++nr;
         }
-        *field_nr = nr;
+
+        zproto_buffer_fill(zb, field_nr, nr);
 
         return 0;
 }

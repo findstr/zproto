@@ -32,10 +32,11 @@ struct zproto_record *zproto_query(struct zproto *z, const char *name);
 struct zproto_field *zproto_field(struct zproto *z, struct zproto_record *proto);
 
 void zproto_buffer_drop(struct zproto_buffer *zb);
+void zproto_buffer_fill(struct zproto_buffer *zb, int32_t pos, int32_t val);
 
 struct zproto_buffer *zproto_encode_begin(int32_t protocol);
 char *zproto_encode_end(struct zproto_buffer *zb, int *sz);
-int32_t *zproto_encode_record(struct zproto_buffer *zb);
+int32_t zproto_encode_record(struct zproto_buffer *zb);
 void zproto_encode_tag(struct zproto_buffer *zb, struct zproto_field *last, struct zproto_field *field, int32_t count);
 void zproto_encode(struct zproto_buffer *zb, struct zproto_field *last, struct zproto_field *field, const char *data, int32_t sz);
 

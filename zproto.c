@@ -446,6 +446,14 @@ zproto_buffer_drop(struct zproto_buffer *zb)
         return ;
 }
 
+void
+zproto_buffer_fill(struct zproto_buffer *zb, int32_t pos, int32_t val)
+{
+        assert(pos < zb->cap);
+        *(int32_t *)&zb->p[pos] = val;
+        return ;
+}
+
 struct zproto_buffer *
 zproto_encode_begin(int32_t protocol)
 {
@@ -492,11 +500,11 @@ tag_skip(struct zproto_field *last, struct zproto_field *field)
         return skip;
 }
 
-int32_t *
+int32_t
 zproto_encode_record(struct zproto_buffer *zb)
 {
         resize_buffer(zb, sizeof(int32_t));
-        int32_t *nr = (int32_t *)&zb->p[zb->start];
+        int32_t nr = zb->start;
         zb->start += sizeof(int32_t);
         return nr;
 }
