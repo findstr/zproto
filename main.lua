@@ -1,6 +1,5 @@
 local zproto = require "zproto"
-print("zproto", zproto.encode)
-local proto = zproto.parse ([[
+local proto = zproto:parse ([[
 info {
         .name:string 1
         .age:integer 2
@@ -25,13 +24,11 @@ local packet = {
         luck = {1, 3, 9},
 }
 
-local record = zproto.query(proto, "packet")
-local data, sz = zproto.encode(proto, record, 8895, packet)
-
-local protocol = zproto.protocol(data, sz)
+local data, sz = proto:encode("packet", 8895, packet)
+local protocol = proto:protocol(data, sz)
 print("protocol", protocol)
 
-local unpack = zproto.decode(proto, record, data, sz);
+local unpack = proto:decode("packet", data, sz);
 local function dump_tbl(s, tbl, n)
         for k, v in pairs(tbl) do
                 str = ""
@@ -49,4 +46,7 @@ local function dump_tbl(s, tbl, n)
 end
 
 dump_tbl("", unpack, 0)
+
+proto = nil
+
 

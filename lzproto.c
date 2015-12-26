@@ -309,7 +309,7 @@ ldecode(lua_State *L)
 }
 
 int
-luaopen_zproto(lua_State *L)
+luaopen_zprotoparser(lua_State *L)
 {
         luaL_Reg tbl[] = {
                 {"load", lload},
