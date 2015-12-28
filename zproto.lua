@@ -2,9 +2,6 @@ local engine = require "zprotoparser"
 
 local zproto = {}
 
-local protocache = {}
-
-setmetatable(protocache, {__mode = "v"})
 
 local function create(self)
         local t = {}
@@ -16,6 +13,10 @@ local function create(self)
                         end
                 end
         })
+
+	t.protocache = {}
+	setmetatable(t.protocache, {__mode = "v"})
+
         return t;
 end
 
@@ -32,11 +33,11 @@ function zproto:parse(str)
 end
 
 local function query(self, typ)
-        local record = protocache[typ]
+        local record = self.protocache[typ]
         assert(self.proto)
         if not record then
                 record = engine.query(self.proto, typ)
-                protocache[typ] = record
+                self.protocache[typ] = record
         end
 
         return record
