@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -185,7 +186,7 @@ unique_field(struct zproto *z, struct zproto_record *proto, const char *name, in
         struct zproto_field *tmp;
 
         if (tag <= 0) {
-                fprintf(stderr, "line:%d syntax error: tag must great then 0\n");
+                fprintf(stderr, "line:%d syntax error: tag must great then 0\n", z->linenr);
                 THROW(z);
         }
 
@@ -486,18 +487,6 @@ resize_buffer(struct zproto_buffer *zb, int sz)
         assert(zb->cap >= sz);
 
         return ;
-}
-
-static int
-tag_skip(struct zproto_field *last, struct zproto_field *field)
-{
-        int lasttag = last ? last->tag : 0;
-        int skip;
-
-        skip = field->tag - lasttag - 1;
-        assert(skip >= 0);
-
-        return skip;
 }
 
 int32_t

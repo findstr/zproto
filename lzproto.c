@@ -267,7 +267,6 @@ decode_table(lua_State *L, struct zproto_record *proto, struct zproto_buffer *zb
         int i;
         int sz;
         int err;
-        struct zproto *z = zproto(L);
         struct zproto_field *last = NULL;
         struct zproto_field *field;
         int field_nr = zproto_decode_record(zb);
@@ -309,7 +308,7 @@ ldecode(lua_State *L)
 }
 
 int
-luaopen_zprotoparser(lua_State *L)
+luaopen_zproto_c(lua_State *L)
 {
         luaL_Reg tbl[] = {
                 {"load", lload},

@@ -1,4 +1,4 @@
-local engine = require "zprotoparser"
+local engine = require "zproto.c"
 
 local zproto = {}
 
