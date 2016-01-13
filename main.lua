@@ -25,10 +25,14 @@ local packet = {
 }
 
 local data, sz = proto:encode("packet", 8895, packet)
-local protocol = proto:protocol(data, sz)
+local packed = proto:pack(data, sz)
+
+print("packed:", data, sz, #packed)
+local data1, sz1 = proto:unpack(packed)
+local protocol = proto:protocol(data1, sz1)
 print("protocol", protocol)
 
-local unpack = proto:decode("packet", data, sz);
+local unpack = proto:decode("packet", data1, sz1);
 local function dump_tbl(s, tbl, n)
         for k, v in pairs(tbl) do
                 str = ""
@@ -46,7 +50,6 @@ local function dump_tbl(s, tbl, n)
 end
 
 dump_tbl("", unpack, 0)
-
 proto = nil
 
 
