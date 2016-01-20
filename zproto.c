@@ -14,8 +14,8 @@
 
 
 struct pool_chunk {
-        int start;
-        int last;
+        size_t start;
+        size_t last;
         struct pool_chunk *next;
 };
 
@@ -447,7 +447,7 @@ zproto_free(struct zproto *z)
 }
 //////////encode/decode
 void
-zproto_buffer_fill(struct zproto_buffer *zb, int32_t pos, int32_t val)
+zproto_buffer_fill(struct zproto_buffer *zb, size_t pos, int32_t val)
 {
         assert(pos < zb->cap);
         *(int32_t *)&zb->p[pos] = val;
@@ -455,7 +455,7 @@ zproto_buffer_fill(struct zproto_buffer *zb, int32_t pos, int32_t val)
 }
 
 static void
-buffer_check(struct zproto_buffer *zb, int sz, int pack)
+buffer_check(struct zproto_buffer *zb, size_t sz, size_t pack)
 {
         if (zb->cap < (sz + zb->start)) {
                 zb->cap = zb->cap + ((sz + ZBUFFER_SIZE - 1) / ZBUFFER_SIZE) * ZBUFFER_SIZE;
@@ -492,11 +492,11 @@ zproto_encode_end(struct zproto_buffer *zb, int *sz)
 }
 
 
-int32_t
+size_t
 zproto_encode_record(struct zproto_buffer *zb)
 {
         buffer_check(zb, sizeof(int32_t), 0);
-        int32_t nr = zb->start;
+        size_t nr = zb->start;
         zb->start += sizeof(int32_t);
         return nr;
 }
@@ -548,7 +548,7 @@ zproto_encode(struct zproto_buffer *zb, struct zproto_field *last, struct zproto
         return ;
 }
 
-int32_t zproto_decode_protocol(uint8_t *buff, int sz)
+int32_t zproto_decode_protocol(uint8_t *buff, size_t sz)
 {
         if (sz < sizeof(int32_t))
                 return -1;

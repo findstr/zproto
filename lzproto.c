@@ -317,10 +317,10 @@ ldecode(lua_State *L)
 {
         int err;
         uint8_t *ud;
-        int sz;
+        size_t sz;
         struct zproto *z = zproto(L);
         struct zproto_record *proto = lua_touserdata(L, 2);
-        ud = (uint8_t *)get_buffer(L, 3, (size_t *)&sz);
+        ud = (uint8_t *)get_buffer(L, 3, &sz);
 
         struct zproto_buffer *zb = zproto_decode_begin(z, ud, sz);
         lua_newtable(L);
@@ -367,7 +367,7 @@ lunpack(lua_State *L)
         int osz;
         const uint8_t *ud;
         const uint8_t *unpack;
-        ud = (uint8_t *)get_buffer(L, 2, &sz);
+        ud = get_buffer(L, 2, &sz);
         unpack = zproto_unpack(zproto(L), ud, sz, &osz);
         if (unpack) {
                 lua_pushlightuserdata(L, (uint8_t *)unpack);
