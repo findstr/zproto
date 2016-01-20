@@ -559,6 +559,7 @@ struct zproto_buffer *
 zproto_decode_begin(struct zproto *z, const uint8_t *buff, int sz)
 {
         struct zproto_buffer *zb = &z->dbuffer;
+        zb->start = 0;
         zb->p = (uint8_t *)buff;
         zb->cap = sz;
         zb->start += sizeof(int32_t);   //skip protocol field
