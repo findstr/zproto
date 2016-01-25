@@ -282,7 +282,7 @@ field(struct zproto *z, struct zproto_record *proto)
         char field[64];
         char type[64];
         skip_space(z);
-        n = sscanf(z->data, ".%64[a-zA-Z0-9]:%64[]a-zA-Z0-9\[]%*[' '|'\t']%d", field, type, &tag);
+        n = sscanf(z->data, ".%64[a-zA-Z0-9_]:%64[]a-zA-Z0-9\[]%*[' '|'\t']%d", field, type, &tag);
         if (n != 3) {
                 fprintf(stderr, "line:%d synax error: expect field definition, but found:%s\n", z->linenr, z->data);
                 THROW(z);
@@ -328,7 +328,7 @@ record(struct zproto *z, struct zproto_record *proto)
 
         next_token(z);
         
-        while (*z->data != '.') {       //child record
+        while (*z->data != '.' && *z->data != '}') {       //child record
                 record(z, new);
                 skip_space(z);
         }
@@ -337,7 +337,6 @@ record(struct zproto *z, struct zproto_record *proto)
                 field(z, new);
                 next_line(z);
         }
-
         if (*z->data != '}') {
                 fprintf(stderr, "line:%d syntax error: expect '}', but found:%s\n", z->linenr, z->data);
                 THROW(z);
