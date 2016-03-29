@@ -102,38 +102,39 @@ lprotocol(lua_State *L)
 static int encode_table(lua_State *L, struct zproto_buffer *zb, struct zproto_record *proto);
 
 static int
-encode_data(lua_State *L, struct zproto_buffer *zb, struct zproto_field *last, struct zproto_field *field)
+encode_data(lua_State *L, struct zproto_buffer *zb, struct zproto_field_iter *iter)
 {
         int err = 0;
-        if ((field->type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
+        int type = zproto_field_type(iter->p);
+        const char *name = zproto_field_name(iter->p);
+        if ((type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
                 if (lua_type(L, -1) != LUA_TNUMBER) {
-                        fprintf(stderr, "encode_data:need integer field:%s\n", field->name);
+                        fprintf(stderr, "encode_data:need integer field:%s\n", name);
                         return -1;
                 }
 
                 int32_t d = luaL_checkinteger(L, -1);
-                zproto_encode(zb, last, field, (char *)&d, sizeof(d));
-        } else if ((field->type & ZPROTO_TYPE) == ZPROTO_STRING) {
+                zproto_encode(zb, iter, (char *)&d, sizeof(d));
+        } else if ((type & ZPROTO_TYPE) == ZPROTO_STRING) {
                 if (lua_type(L, -1) != LUA_TSTRING) {
-                        fprintf(stderr, "encode_data:need string field:%s\n", field->name);
+                        fprintf(stderr, "encode_data:need string field:%s\n", name);
                         return -1;
                 }
 
                 size_t sz;
                 const char *d = luaL_checklstring(L, -1, &sz);
-                zproto_encode(zb, last, field, d, sz);
-        } else if ((field->type & ZPROTO_TYPE) == ZPROTO_RECORD) {
+                zproto_encode(zb, iter, d, sz);
+        } else if ((type & ZPROTO_TYPE) == ZPROTO_RECORD) {
+                struct zproto_record *seminfo = zproto_field_seminfo(iter->p);
                 if (lua_type(L, -1) != LUA_TTABLE) {
-                        fprintf(stderr, "encode_data:need table field:%s\n", field->name);
+                        fprintf(stderr, "encode_data:need table field:%s\n", name);
                         return -1;
                 }
-                if ((field->type & ZPROTO_ARRAY) == 0) {
-                        zproto_encode_tag(zb, last, field, 0);
-                }
 
-                err = encode_table(L, zb, field->seminfo);
+                zproto_encode(zb, iter, NULL, 0);
+                err = encode_table(L, zb, seminfo);
         } else {
-                fprintf(stderr, "encode_data, unkonw field type:%d\n", field->type);
+                fprintf(stderr, "encode_data, unkonw field type:%d\n", type);
                 err = -1;
         }
         
@@ -141,15 +142,15 @@ encode_data(lua_State *L, struct zproto_buffer *zb, struct zproto_field *last, s
 }
 
 static int
-encode_array(lua_State *L, struct zproto_buffer *zb, struct zproto_field *last, struct zproto_field *field)
+encode_array(lua_State *L, struct zproto_buffer *zb, struct zproto_field_iter *iter)
 {
         int i;
         int err;
         int acount = lua_rawlen(L, -1);
-        zproto_encode_tag(zb, last, field, acount);
+        zproto_encode_array(zb, iter, acount);
         for (i = 1; i <= acount; i++) {
                 lua_rawgeti(L, -1, i);
-                err = encode_data(L, zb, last, field);
+                err = encode_data(L, zb, iter);
                 lua_pop(L, 1);
                 if (err < 0)
                         return err;
@@ -162,33 +163,30 @@ static int
 encode_table(lua_State *L, struct zproto_buffer *zb, struct zproto_record *proto)
 {
         int err;
-        struct zproto *z = zproto(L);
-        struct zproto_field *last = NULL;
-        struct zproto_field *field;
         int nr = 0;
+        struct zproto_field_iter iter;
         int32_t field_nr = zproto_encode_record(zb);
-        for (field = zproto_field(z, proto); field; field = field->next) {
-                lua_getfield(L, -1, field->name);
+        for (zproto_field_begin(proto, &iter); !zproto_field_end(&iter); zproto_field_next(&iter)) {
+                lua_getfield(L, -1, zproto_field_name(iter.p));
                 if (lua_type(L, -1) == LUA_TNIL) {
                         lua_pop(L, 1);
                         continue;
                 }
 
-                if (field->type & ZPROTO_ARRAY) {
-                        err = encode_array(L, zb, last, field);
+                if (zproto_field_type(iter.p) & ZPROTO_ARRAY) {
+                        err = encode_array(L, zb, &iter);
                         if (err < 0)
                                 return err;
                 } else {
-                        err = encode_data(L, zb, last, field);
+                        err = encode_data(L, zb, &iter);
                         if (err < 0)
                                 return err;
                 }
                 lua_pop(L, 1);
-                last = field;
                 ++nr;
         }
 
-        zproto_buffer_fill(zb, field_nr, nr);
+        zproto_encode_recordnr(zb, field_nr, nr);
 
         return 0;
 }
@@ -224,32 +222,32 @@ lencode(lua_State *L)
 static int decode_table(lua_State *L, struct zproto_record *proto, struct zproto_buffer *zb);
 
 static int
-decode_data(lua_State *L, struct zproto_field *field, struct  zproto_buffer *zb)
+decode_data(lua_State *L, struct zproto_field_iter *iter, struct  zproto_buffer *zb)
 {
         int err;
-
-        if ((field->type & ZPROTO_TYPE) == ZPROTO_STRING) {
+        int type = zproto_field_type(iter->p);
+        if ((type & ZPROTO_TYPE) == ZPROTO_STRING) {
                 uint8_t *str;
                 int32_t sz;
-                err = zproto_decode(zb, field, &str, &sz);
+                err = zproto_decode(zb, iter, &str, &sz);
                 if (err < 0)
                         return err;
                 lua_pushlstring(L, (char *)str, sz);
-        } else if ((field->type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
+        } else if ((type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
                 int32_t *d;
                 int32_t sz;
-                err = zproto_decode(zb, field, (uint8_t **)&d, &sz);
+                err = zproto_decode(zb, iter, (uint8_t **)&d, &sz);
                 if (err < 0)
                         return err;
                 assert(sz == sizeof(int32_t));
                 lua_pushinteger(L, *d);
-        } else if ((field->type & ZPROTO_TYPE) == ZPROTO_RECORD) {
+        } else if ((type & ZPROTO_TYPE) == ZPROTO_RECORD) {
                 lua_newtable(L);
-                err = decode_table(L, field->seminfo, zb);
+                err = decode_table(L, zproto_field_seminfo(iter->p), zb);
                 if (err < 0)
                         return err;
         } else {
-                fprintf(stderr, "invalid field type:%d\n", field->type);
+                fprintf(stderr, "invalid field type:%d\n", type);
                 return -1;
         }
 
@@ -257,14 +255,13 @@ decode_data(lua_State *L, struct zproto_field *field, struct  zproto_buffer *zb)
 }
 
 static int
-decode_array(lua_State *L, struct zproto_field *field, struct zproto_buffer *zb, int count)
+decode_array(lua_State *L, struct zproto_field_iter *iter, struct zproto_buffer *zb, int count)
 {
         int i;
         int err;
-        
         lua_newtable(L);
         for (i = 1; i <= count; i++) {
-                err = decode_data(L, field, zb);
+                err = decode_data(L, iter, zb);
                 if (err < 0)
                         return err;
                 lua_rawseti(L, -2, i);
@@ -279,21 +276,19 @@ decode_table(lua_State *L, struct zproto_record *proto, struct zproto_buffer *zb
         int i;
         int sz;
         int err;
-        struct zproto_field *last = NULL;
-        struct zproto_field *field;
-        int field_nr = zproto_decode_record(zb);
-
+        struct zproto_field_iter iter;
+        int field_nr = zproto_decode_record(zb, &iter);
         for (i = 0; i < field_nr; i++) {
-                field = zproto_decode_tag(zb, last, proto, &sz);
-                assert(field);
-                if (field->type & ZPROTO_ARRAY)
-                        err = decode_array(L, field, zb, sz);
-                else
-                        err = decode_data(L, field, zb);
+                err = zproto_decode_field(zb, proto, &iter, &sz);
                 if (err < 0)
                         return err;
-                lua_setfield(L, -2, field->name);
-                last = field;
+                if (zproto_field_type(iter.p) & ZPROTO_ARRAY)
+                        err = decode_array(L, &iter, zb, sz);
+                else
+                        err = decode_data(L, &iter, zb);
+                if (err < 0)
+                        return err;
+                lua_setfield(L, -2, zproto_field_name(iter.p));
         }
 
         return 0;

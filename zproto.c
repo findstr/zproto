@@ -19,6 +19,14 @@ struct pool_chunk {
         struct pool_chunk *next;
 };
 
+struct zproto_field {
+        int                     tag;
+        int                     type;
+        const char              *name;
+        struct zproto_record    *seminfo;
+        struct zproto_field     *next;
+};
+
 struct zproto_record {
         const char              *name;
         int                     fieldnr;
@@ -414,11 +422,43 @@ zproto_query(struct zproto *z, const char *name)
         return NULL;
 }
 
-struct zproto_field *
-zproto_field(struct zproto *z, struct zproto_record *proto)
+int
+zproto_field_type(struct zproto_field *field)
 {
-        assert(z);
-        return proto->field;
+        return field->type;
+}
+
+const char *
+zproto_field_name(struct zproto_field *field)
+{
+        return field->name;
+}
+
+struct zproto_record *
+zproto_field_seminfo(struct zproto_field *field)
+{
+        return field->seminfo;
+}
+
+void
+zproto_field_begin(struct zproto_record *proto, struct zproto_field_iter *iter)
+{
+        iter->p = proto->field;
+        iter->reserve = NULL;
+        return ;
+}
+
+void 
+zproto_field_next(struct zproto_field_iter *iter)
+{
+        iter->p = iter->p->next;
+        return ;
+}
+
+int 
+zproto_field_end(struct zproto_field_iter *iter)
+{
+        return iter->p == NULL;
 }
 
 struct zproto *
@@ -445,14 +485,6 @@ zproto_free(struct zproto *z)
         return ;
 }
 //////////encode/decode
-void
-zproto_buffer_fill(struct zproto_buffer *zb, size_t pos, int32_t val)
-{
-        assert(pos < zb->cap);
-        *(int32_t *)&zb->p[pos] = val;
-        return ;
-}
-
 static void
 buffer_check(struct zproto_buffer *zb, size_t sz, size_t pack)
 {
@@ -501,10 +533,22 @@ zproto_encode_record(struct zproto_buffer *zb)
 }
 
 void
-zproto_encode_tag(struct zproto_buffer *zb, struct zproto_field *last, struct zproto_field *field, int32_t count)
+zproto_encode_recordnr(struct zproto_buffer *zb, size_t pos, int32_t val)
 {
+        assert(pos < zb->cap);
+        *(int32_t *)&zb->p[pos] = val;
+        return ;
+}
+
+static void
+encode_tag(struct zproto_buffer *zb, struct zproto_field_iter *iter)
+{
+        struct zproto_field *last = iter->reserve;
+        struct zproto_field *field = iter->p;
         int lasttag = last ? last->tag : 0;
         int skip;
+        
+        iter->reserve = iter->p;
 
         buffer_check(zb, sizeof(int32_t), 0);
         skip = field->tag - lasttag - 1;
@@ -512,10 +556,14 @@ zproto_encode_tag(struct zproto_buffer *zb, struct zproto_field *last, struct zp
 
         *(int32_t *)&zb->p[zb->start] = skip;
         zb->start += sizeof(int32_t);
+        return ;
+}
 
-        if ((field->type & ZPROTO_ARRAY) == 0)
-                return ;
-
+void
+zproto_encode_array(struct zproto_buffer *zb, struct zproto_field_iter *iter, int32_t count)
+{
+        encode_tag(zb, iter);
+        assert(iter->p->type & ZPROTO_ARRAY);
         //tag of array need count
         buffer_check(zb, sizeof(int32_t), 0);
         int32_t *nr = (int32_t *)&zb->p[zb->start];
@@ -524,12 +572,16 @@ zproto_encode_tag(struct zproto_buffer *zb, struct zproto_field *last, struct zp
         return ;
 }
 
-void 
-zproto_encode(struct zproto_buffer *zb, struct zproto_field *last, struct zproto_field *field, const char *data, int32_t sz)
+void
+zproto_encode(struct zproto_buffer *zb, struct zproto_field_iter *iter, const char *data, int32_t sz)
 {
-        if ((field->type & ZPROTO_ARRAY) == 0) {
-                zproto_encode_tag(zb, last, field, 0);
-        }
+        struct zproto_field *field = iter->p;
+
+        if ((field->type & ZPROTO_ARRAY) == 0)
+                encode_tag(zb, iter);
+        
+        if ((field->type & ZPROTO_TYPE) == ZPROTO_RECORD)
+                return ;
 
         if ((field->type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
                 buffer_check(zb, sizeof(int32_t), 0);
@@ -573,29 +625,32 @@ zproto_decode_end(struct zproto_buffer *zb)
 }
 
 int32_t
-zproto_decode_record(struct zproto_buffer *zb)
+zproto_decode_record(struct zproto_buffer *zb, struct zproto_field_iter *iter)
 {
         int32_t nr;
         if (zb->start + sizeof(int32_t) >= zb->cap)
                 return 0;
         nr = *(int32_t *)&zb->p[zb->start];
         zb->start += sizeof(int32_t);
+        iter->p = NULL;
+        iter->reserve = NULL;
         return nr;
 }
 
-struct zproto_field *
-zproto_decode_tag(struct zproto_buffer *zb, struct zproto_field *last, struct zproto_record *proto, int32_t *sz)
+int 
+zproto_decode_field(struct zproto_buffer *zb, struct zproto_record *proto, struct zproto_field_iter *iter, int32_t *sz)
 {
         struct zproto_field *field;
+        struct zproto_field *last = iter->p;
+
         int32_t ltag = last ? last->tag : 0;
         int32_t skip = *(int32_t *)&zb->p[zb->start];
         zb->start += sizeof(int32_t);
         ltag += skip + 1;
         if (ltag >= proto->fieldnr)
-                return NULL;
+                return -1;
 
         field = proto->fieldarray[ltag];
-
         if (field->type & ZPROTO_ARRAY) {
                 *sz = *(int32_t *)&zb->p[zb->start];
                 zb->start += sizeof(int32_t);
@@ -603,12 +658,14 @@ zproto_decode_tag(struct zproto_buffer *zb, struct zproto_field *last, struct zp
                 *sz = 0;
         }
 
-        return field;
+        iter->p = field;
+        return 0;
 }
 
 int
-zproto_decode(struct zproto_buffer *zb, struct zproto_field *field, uint8_t **data, int32_t *sz)
+zproto_decode(struct zproto_buffer *zb, struct zproto_field_iter *iter, uint8_t **data, int32_t *sz)
 {
+        struct zproto_field *field = iter->p;
         if (zb->start + sizeof(int32_t) > zb->cap)
                 return -1;
 
