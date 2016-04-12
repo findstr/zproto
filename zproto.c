@@ -637,13 +637,19 @@ zproto_decode_record(struct zproto_buffer *zb, struct zproto_field_iter *iter)
         return nr;
 }
 
+#define decode_check(zb, sz, err)       \
+        if (zb->start + (sz) > zb->cap)   \
+                return err;
+
 int 
 zproto_decode_field(struct zproto_buffer *zb, struct zproto_record *proto, struct zproto_field_iter *iter, int32_t *sz)
 {
         struct zproto_field *field;
         struct zproto_field *last = iter->p;
-
         int32_t ltag = last ? last->tag : 0;
+
+        decode_check(zb, sizeof(int32_t), -1)
+
         int32_t skip = *(int32_t *)&zb->p[zb->start];
         zb->start += sizeof(int32_t);
         ltag += skip + 1;
@@ -652,6 +658,7 @@ zproto_decode_field(struct zproto_buffer *zb, struct zproto_record *proto, struc
 
         field = proto->fieldarray[ltag];
         if (field->type & ZPROTO_ARRAY) {
+                decode_check(zb, sizeof(int32_t), -1)
                 *sz = *(int32_t *)&zb->p[zb->start];
                 zb->start += sizeof(int32_t);
         } else {
@@ -666,9 +673,8 @@ int
 zproto_decode(struct zproto_buffer *zb, struct zproto_field_iter *iter, uint8_t **data, int32_t *sz)
 {
         struct zproto_field *field = iter->p;
-        if (zb->start + sizeof(int32_t) > zb->cap)
-                return -1;
-
+        
+        decode_check(zb, sizeof(int32_t), -1)
         if ((field->type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
                 *sz = sizeof(int32_t);
                 *data = &zb->p[zb->start];
@@ -676,9 +682,7 @@ zproto_decode(struct zproto_buffer *zb, struct zproto_field_iter *iter, uint8_t 
         } else if ((field->type & ZPROTO_TYPE) == ZPROTO_STRING) {
                 *sz = *(int32_t *)&zb->p[zb->start];
                 zb->start += sizeof(int32_t);
-                if (zb->start + sizeof(int32_t) > zb->cap)
-                        return -1;
-
+                decode_check(zb, *sz, -1)
                 *data = &zb->p[zb->start];
                 zb->start += *sz;
         }
