@@ -62,6 +62,7 @@ pool_alloc(struct zproto *z, size_t sz)
 {
         struct pool_chunk *c = z->now;
         assert(c->next == NULL);
+        sz = (sz + 7) & (~7);   //align to 8 for performance
         if (c->last < sz) {
                 void *p;
                 struct pool_chunk *new;
