@@ -25,6 +25,7 @@ void zproto_free(struct zproto *z);
 int zproto_load(struct zproto *z, const char *path);
 int zproto_parse(struct zproto *z, const char *data);
 struct zproto_record *zproto_query(struct zproto *z, const char *name);
+struct zproto_record *zproto_querytag(struct zproto *z, uint32_t tag);
 
 //field
 int zproto_field_type(struct zproto_field *field);
@@ -37,7 +38,7 @@ void zproto_field_next(struct zproto_field_iter *iter);
 int zproto_field_end(struct zproto_field_iter *iter);
 
 //encode
-struct zproto_buffer *zproto_encode_begin(struct zproto *z, int32_t protocol);
+struct zproto_buffer *zproto_encode_begin(struct zproto *z);
 const uint8_t *zproto_encode_end(struct zproto_buffer *zb, int *sz);
 
 size_t zproto_encode_record(struct zproto_buffer *zb);
@@ -47,8 +48,6 @@ void zproto_encode_array(struct zproto_buffer *zb, struct zproto_field_iter *ite
 void zproto_encode(struct zproto_buffer *zb, struct zproto_field_iter *iter, const char *data, int32_t sz);
 
 //decode
-int32_t zproto_decode_protocol(uint8_t *buffer, size_t sz);
-
 struct zproto_buffer *zproto_decode_begin(struct zproto *z, const uint8_t *buff, int sz);
 void zproto_decode_end(struct zproto_buffer *zb);
 

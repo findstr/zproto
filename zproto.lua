@@ -2,21 +2,25 @@ local engine = require "zproto.c"
 
 local zproto = {}
 
+local cachemt = {__mode = "kv"}
+local indexmt = {
+        __index = zproto,
+        __gc = function(table)
+                if t.proto then
+                        engine.free(t.proto)
+                end
+        end
+}
+
+
 
 local function create(self)
         local t = {}
-        setmetatable(t, {
-                __index = self,
-                __gc = function(table)
-                        if t.proto then
-                                engine.free(t.proto)
-                        end
-                end
-        })
-
-	t.protocache = {}
-	setmetatable(t.protocache, {__mode = "v"})
-
+	t.ncache = {}   -- name cache
+        t.tcache = {}   -- tag cache
+        setmetatable(t, indexmt)
+        setmetatable(t.ncache, cachemt)
+        setmetatable(t.tcache, cachemt)
         return t;
 end
 
@@ -33,23 +37,28 @@ function zproto:parse(str)
 end
 
 local function query(self, typ)
-        local record = self.protocache[typ]
+        local cache
+        if type(typ) == "number" then
+                cache = self.tcache
+        elseif type(typ) == "string" then
+                cache = self.ncache
+        end
+        local record = cache[typ]
         assert(self.proto)
         if not record then
                 record = engine.query(self.proto, typ)
-                self.protocache[typ] = record
+                cache[typ] = record
         end
         assert(record)
-
         return record
 end
 
-function zproto:encode(typ, protocol, packet)
+function zproto:encode(typ, packet)
         local record = query(self, typ)
         assert(record)
         assert(typ)
         assert(packet)
-        return engine.encode(self.proto, record, protocol, packet)
+        return engine.encode(self.proto, record, packet)
 end
 
 function zproto:protocol(data, sz)

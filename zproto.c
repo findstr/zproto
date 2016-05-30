@@ -28,6 +28,7 @@ struct zproto_field {
 };
 
 struct zproto_record {
+        uint32_t                tag;
         const char              *name;
         int                     fieldnr;
         struct zproto_record    *next;
@@ -311,24 +312,34 @@ field(struct zproto *z, struct zproto_record *proto)
 }
 
 static void
-record(struct zproto *z, struct zproto_record *proto)
+record(struct zproto *z, struct zproto_record *proto, int protocol)
 {
         int err;
+        int tag;
         char name[64];
         struct zproto_record *new = (struct zproto_record *)pool_alloc(z, sizeof(*new));
         memset(new, 0, sizeof(*new));
         new->next = proto->child;
         new->parent = proto;
-
         skip_space(z);
-        err = sscanf(z->data, "%64s", name);
-        if (err != 1) {
-                fprintf(stderr, "line:%d syntax error: expect record name\n", z->linenr);
+        if (protocol == 0) {
+                err = sscanf(z->data, "%64s", name);
+        } else {
+                char buff[64];
+                buff[0] = 0;
+                err = sscanf(z->data, "%64s %32[0-9A-Za-zxX]", name, buff);
+                tag = strtoul(buff, NULL, 0);
+        }
+        if (err < 1) {
+                fprintf(stderr, "line:%d syntax error: expect 'record name' [tag]\n", z->linenr);
                 THROW(z);
         }
         unique_record(z, proto, name);
         new->name = pool_dupstr(z, name);
+        new->tag = tag;
         next_token(z);
+        if (err == 2)
+                next_token(z);
 
         if (*z->data != '{') {
                 fprintf(stderr, "line:%d syntax error: expect '{', but found:%s\n", z->linenr, z->data);
@@ -338,7 +349,7 @@ record(struct zproto *z, struct zproto_record *proto)
         next_token(z);
         
         while (*z->data != '.' && *z->data != '}') {       //child record
-                record(z, new);
+                record(z, new, 0);
                 skip_space(z);
         }
 
@@ -364,7 +375,7 @@ zproto_parse(struct zproto *z, const char *data)
         z->data = data;
         TRY(z) {
                 do {
-                        record(z, &z->record);
+                        record(z, &z->record, 1);
                 } while (eos(z) == 0);
 
                 return 0;
@@ -414,12 +425,21 @@ struct zproto_record *
 zproto_query(struct zproto *z, const char *name)
 {
         struct zproto_record *r;
-        
         for (r = z->record.child; r; r = r->next) {
                 if (strcmp(r->name, name) == 0)
                         return r;
         }
 
+        return NULL;
+}
+
+struct zproto_record *zproto_querytag(struct zproto *z, uint32_t tag)
+{
+        struct zproto_record *r;
+        for (r = z->record.child; r; r = r->next) {
+                if (r->tag == tag)
+                        return r;
+        }
         return NULL;
 }
 
@@ -506,13 +526,10 @@ buffer_check(struct zproto_buffer *zb, size_t sz, size_t pack)
 }
 
 struct zproto_buffer *
-zproto_encode_begin(struct zproto *z, int32_t protocol)
+zproto_encode_begin(struct zproto *z)
 {
         struct zproto_buffer *zb = &z->ebuffer;
-        buffer_check(zb, sizeof(int32_t), 0);
         zb->start = 0;
-        *(int32_t *)(zb->p) = protocol;
-        zb->start += sizeof(int32_t);
         return zb;
 }
 
@@ -614,7 +631,6 @@ zproto_decode_begin(struct zproto *z, const uint8_t *buff, int sz)
         zb->start = 0;
         zb->p = (uint8_t *)buff;
         zb->cap = sz;
-        zb->start += sizeof(int32_t);   //skip protocol field
         return zb;
 }
 

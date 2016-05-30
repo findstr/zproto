@@ -5,7 +5,7 @@ info {
         .age:integer 2
 }
 
-packet {
+packet 0xfe {
         phone {
                 .home:integer 1
                 .work:integer 2
@@ -24,13 +24,11 @@ local packet = {
         luck = {1, 3, 9},
 }
 
-local data, sz = proto:encode("packet", 8895, packet)
+local data, sz = proto:encode(0xfe, packet)
 local packed = proto:pack(data, sz)
 
 print("packed:", data, sz, #packed)
 local data1, sz1 = proto:unpack(packed)
-local protocol = proto:protocol(data1, sz1)
-print("protocol", protocol)
 
 local unpack = proto:decode("packet", data1, sz1);
 local function dump_tbl(s, tbl, n)
