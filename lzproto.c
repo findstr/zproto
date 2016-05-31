@@ -97,33 +97,46 @@ encode_data(lua_State *L, struct zproto_buffer *zb, struct zproto_field_iter *it
         int err = 0;
         int type = zproto_field_type(iter->p);
         const char *name = zproto_field_name(iter->p);
-        if ((type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
+        switch (type & ZPROTO_TYPE) {
+        case ZPROTO_BOOLEAN: {
+                if (lua_type(L, -1) != LUA_TBOOLEAN) {
+                        fprintf(stderr, "encode data:need boolean field:%s\n", name);
+                        return -1;
+                }
+                int8_t d = lua_toboolean(L, -1);
+                zproto_encode(zb, iter, (char *)&d, sizeof(d));
+                break;
+        }
+        case ZPROTO_INTEGER: {
                 if (lua_type(L, -1) != LUA_TNUMBER) {
                         fprintf(stderr, "encode_data:need integer field:%s\n", name);
                         return -1;
                 }
-
                 int32_t d = luaL_checkinteger(L, -1);
                 zproto_encode(zb, iter, (char *)&d, sizeof(d));
-        } else if ((type & ZPROTO_TYPE) == ZPROTO_STRING) {
+                break;
+        }
+        case ZPROTO_STRING: {
                 if (lua_type(L, -1) != LUA_TSTRING) {
                         fprintf(stderr, "encode_data:need string field:%s\n", name);
                         return -1;
                 }
-
                 size_t sz;
                 const char *d = luaL_checklstring(L, -1, &sz);
                 zproto_encode(zb, iter, d, sz);
-        } else if ((type & ZPROTO_TYPE) == ZPROTO_RECORD) {
+                break;
+        }
+        case ZPROTO_RECORD: {
                 struct zproto_record *seminfo = zproto_field_seminfo(iter->p);
                 if (lua_type(L, -1) != LUA_TTABLE) {
                         fprintf(stderr, "encode_data:need table field:%s\n", name);
                         return -1;
                 }
-
                 zproto_encode(zb, iter, NULL, 0);
                 err = encode_table(L, zb, seminfo, deep + 1);
-        } else {
+                break;
+        }
+        default:
                 fprintf(stderr, "encode_data, unkonw field type:%d\n", type);
                 err = -1;
         }
@@ -218,14 +231,27 @@ decode_data(lua_State *L, struct zproto_field_iter *iter, struct  zproto_buffer 
 {
         int err;
         int type = zproto_field_type(iter->p);
-        if ((type & ZPROTO_TYPE) == ZPROTO_STRING) {
+        switch (type & ZPROTO_TYPE) {
+        case ZPROTO_BOOLEAN: {
+                uint8_t *b;
+                int32_t sz;
+                err = zproto_decode(zb, iter, &b, &sz);
+                if (err < 0)
+                        return err;
+                assert(sz == 1);
+                lua_pushboolean(L, *b);
+                break;
+        }
+        case ZPROTO_STRING: {
                 uint8_t *str;
                 int32_t sz;
                 err = zproto_decode(zb, iter, &str, &sz);
                 if (err < 0)
                         return err;
                 lua_pushlstring(L, (char *)str, sz);
-        } else if ((type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
+                break;
+        }
+        case ZPROTO_INTEGER: {
                 int32_t *d;
                 int32_t sz;
                 err = zproto_decode(zb, iter, (uint8_t **)&d, &sz);
@@ -233,12 +259,16 @@ decode_data(lua_State *L, struct zproto_field_iter *iter, struct  zproto_buffer 
                         return err;
                 assert(sz == sizeof(int32_t));
                 lua_pushinteger(L, *d);
-        } else if ((type & ZPROTO_TYPE) == ZPROTO_RECORD) {
+                break;
+        }
+        case ZPROTO_RECORD: {
                 lua_newtable(L);
                 err = decode_table(L, zproto_field_seminfo(iter->p), zb, deep + 1);
                 if (err < 0)
                         return err;
-        } else {
+                break;
+        }
+        default:
                 fprintf(stderr, "invalid field type:%d\n", type);
                 return -1;
         }

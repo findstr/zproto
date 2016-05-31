@@ -230,7 +230,9 @@ strtotype(struct zproto *z, struct zproto_record *proto, const char *type, struc
                 sz -= 2;
         }
 
-        if (strncmp(type, "integer", sz) == 0) {
+        if (strncmp(type, "boolean", sz) == 0) {
+                ztype |= ZPROTO_BOOLEAN;
+        } else if (strncmp(type, "integer", sz) == 0) {
                 ztype |= ZPROTO_INTEGER;
         } else if (strncmp(type, "string", sz) == 0) {
                 ztype |= ZPROTO_STRING;
@@ -601,17 +603,29 @@ zproto_encode(struct zproto_buffer *zb, struct zproto_field_iter *iter, const ch
         if ((field->type & ZPROTO_TYPE) == ZPROTO_RECORD)
                 return ;
 
-        if ((field->type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
+        switch (field->type & ZPROTO_TYPE) { 
+        case ZPROTO_BOOLEAN:
+                buffer_check(zb, sizeof(int8_t), 0);
+                assert(sz == sizeof(int8_t));
+                *(int8_t *)&zb->p[zb->start] = *(int8_t *)data;
+                zb->start += sizeof(int8_t);
+                break;
+        case ZPROTO_INTEGER:
                 buffer_check(zb, sizeof(int32_t), 0);
                 assert(sz == sizeof(int32_t));
                 *(int32_t *)&zb->p[zb->start] = *(int32_t *)data;
                 zb->start += sizeof(int32_t);
-        } else if ((field->type & ZPROTO_TYPE) == ZPROTO_STRING) {
+                break;
+        case ZPROTO_STRING:
                 buffer_check(zb, sizeof(int32_t) + sz, 0);
                 *(int32_t *)&zb->p[zb->start] = sz;
                 zb->start += sizeof(int32_t);
                 memcpy(&zb->p[zb->start], data, sz);
                 zb->start += sz;
+                break;
+        default:
+                fprintf(stderr, "zproto_encode, unexpected field->type:%d\n", field->type);
+                break;
         }
 
         return ;
@@ -691,17 +705,30 @@ zproto_decode(struct zproto_buffer *zb, struct zproto_field_iter *iter, uint8_t 
 {
         struct zproto_field *field = iter->p;
         
-        decode_check(zb, sizeof(int32_t), -1)
-        if ((field->type & ZPROTO_TYPE) == ZPROTO_INTEGER) {
+        switch (field->type & ZPROTO_TYPE) {
+        case ZPROTO_INTEGER:
+                decode_check(zb, sizeof(int32_t), -1)
                 *sz = sizeof(int32_t);
                 *data = &zb->p[zb->start];
                 zb->start += sizeof(int32_t);
-        } else if ((field->type & ZPROTO_TYPE) == ZPROTO_STRING) {
+                break;
+        case ZPROTO_STRING:
+                decode_check(zb, sizeof(int32_t), -1)
                 *sz = *(int32_t *)&zb->p[zb->start];
                 zb->start += sizeof(int32_t);
                 decode_check(zb, *sz, -1)
                 *data = &zb->p[zb->start];
                 zb->start += *sz;
+                break;
+        case ZPROTO_BOOLEAN:
+                decode_check(zb, sizeof(int8_t), -1)
+                *sz = sizeof(int8_t);
+                *data = &zb->p[zb->start];
+                zb->start += sizeof(int8_t);
+                break;
+        default:
+                fprintf(stderr, "zproto_decode, unexpedted field->type:%d\n", field->type);
+                break;
         }
 
         return 0;

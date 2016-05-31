@@ -3,6 +3,8 @@ local proto = zproto:parse ([[
 info {
         .name:string 1
         .age:integer 2
+        .girl:boolean 3
+        .boy:boolean 4
 }
 
 packet 0xfe {
@@ -19,7 +21,7 @@ packet 0xfe {
 
 local packet = {
         phone = {home=123456, work=654321},
-        info = {{name = "lucy", age = 18}, {name="lilei", age = 24},},
+        info = {{name = "lucy", age = 18, girl = false, boy = true}, {name="lilei", age = 24, girl = true, boy = false},},
         address = "China.shanghai",
         luck = {1, 3, 9},
 }

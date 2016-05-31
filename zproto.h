@@ -3,9 +3,10 @@
 
 #include <stdint.h>
 
-#define ZPROTO_INTEGER  1
-#define ZPROTO_STRING   2
-#define ZPROTO_RECORD   3
+#define ZPROTO_BOOLEAN  1
+#define ZPROTO_INTEGER  2
+#define ZPROTO_STRING   3
+#define ZPROTO_RECORD   4
 #define ZPROTO_TYPE     (0xffff)
 #define ZPROTO_ARRAY    (1 << 16)
 
