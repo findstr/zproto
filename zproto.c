@@ -445,6 +445,13 @@ struct zproto_record *zproto_querytag(struct zproto *z, uint32_t tag)
         return NULL;
 }
 
+
+uint32_t zproto_tag(struct zproto_record *proto)
+{
+        assert(proto);
+        return proto->tag;
+}
+
 int
 zproto_field_type(struct zproto_field *field)
 {

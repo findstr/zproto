@@ -82,11 +82,13 @@ lquery(lua_State *L)
 
         if (r == NULL) {
                 lua_pushnil(L);
+                lua_pushnil(L);
         } else {
                 lua_pushlightuserdata(L, r);
+                lua_pushinteger(L, zproto_tag(r));
         }
 
-        return 1;
+        return 2;
 }
 
 static int encode_table(lua_State *L, struct zproto_buffer *zb, struct zproto_record *proto, int deep);

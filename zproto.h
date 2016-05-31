@@ -25,8 +25,12 @@ void zproto_free(struct zproto *z);
 
 int zproto_load(struct zproto *z, const char *path);
 int zproto_parse(struct zproto *z, const char *data);
+
 struct zproto_record *zproto_query(struct zproto *z, const char *name);
 struct zproto_record *zproto_querytag(struct zproto *z, uint32_t tag);
+
+//record
+uint32_t zproto_tag(struct zproto_record *proto);
 
 //field
 int zproto_field_type(struct zproto_field *field);

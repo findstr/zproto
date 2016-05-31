@@ -26,6 +26,11 @@ local packet = {
         luck = {1, 3, 9},
 }
 
+local tag = proto:querytag("packet")
+print("packet tag:", tag)
+local tag = proto:querytag("info")
+print("info tag:", tag)
+
 local data, sz = proto:encode(0xfe, packet)
 local packed = proto:pack(data, sz)
 

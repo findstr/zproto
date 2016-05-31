@@ -18,9 +18,12 @@ local function create(self)
         local t = {}
 	t.ncache = {}   -- name cache
         t.tcache = {}   -- tag cache
+        t.nametag = {}  -- name tag cache
         setmetatable(t, indexmt)
         setmetatable(t.ncache, cachemt)
         setmetatable(t.tcache, cachemt)
+        setmetatable(t.nametag, cachemt)
+
         return t;
 end
 
@@ -46,8 +49,9 @@ local function query(self, typ)
         local record = cache[typ]
         assert(self.proto)
         if not record then
-                record = engine.query(self.proto, typ)
+                record, tag = engine.query(self.proto, typ)
                 cache[typ] = record
+                self.nametag[typ] = tag
         end
         assert(record)
         return record
@@ -61,8 +65,14 @@ function zproto:encode(typ, packet)
         return engine.encode(self.proto, record, packet)
 end
 
-function zproto:protocol(data, sz)
-        return engine.protocol(data, sz)
+function zproto:querytag(typ)
+        local tag = self.nametag[typ]
+        if not tag then
+                query(self, typ)
+                tag = self.nametag[typ]
+        end
+        assert(tag)
+        return tag
 end
 
 function zproto:decode(typ, data, sz)
