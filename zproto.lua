@@ -40,21 +40,31 @@ function zproto:parse(str)
 end
 
 local function query(self, typ)
-        local cache
+        local itype
+        local proto
+        assert(type(typ) == "number" or type(typ) == "string")
+
         if type(typ) == "number" then
-                cache = self.tcache
+                itype = true
+                proto = self.tcache[typ]
         elseif type(typ) == "string" then
-                cache = self.ncache
+                itype = false
+                proto = self.ncache[typ]
         end
-        local record = cache[typ]
+        if proto then
+                return proto 
+        end
+
         assert(self.proto)
-        if not record then
-                record, tag = engine.query(self.proto, typ)
-                cache[typ] = record
+        local proto, tag = engine.query(self.proto, typ)
+        assert(proto)
+        if itype then
+                self.tcache[typ] = proto
+        else 
+                self.ncache[typ] = proto
                 self.nametag[typ] = tag
         end
-        assert(record)
-        return record
+        return proto
 end
 
 function zproto:encode(typ, packet)
@@ -66,6 +76,7 @@ function zproto:encode(typ, packet)
 end
 
 function zproto:querytag(typ)
+        assert(type(typ) == "string")
         local tag = self.nametag[typ]
         if not tag then
                 query(self, typ)
