@@ -655,11 +655,11 @@ zproto_decode_begin(struct zproto *z, const uint8_t *buff, int sz)
         return zb;
 }
 
-void
+size_t
 zproto_decode_end(struct zproto_buffer *zb)
 {
         zb->p = NULL;
-        return ;
+        return zb->start;
 }
 
 int32_t

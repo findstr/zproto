@@ -349,13 +349,13 @@ ldecode(lua_State *L)
         struct zproto_buffer *zb = zproto_decode_begin(z, ud, sz);
         lua_newtable(L);
         err = decode_table(L, proto, zb, 0);
-        zproto_decode_end(zb);
+        sz = zproto_decode_end(zb);
         if (err < 0) {
                 lua_settop(L, 1);
                 lua_pushnil(L);
         }
-
-        return 1;
+        lua_pushinteger(L, sz);
+        return 2;
 }
 
 static int

@@ -54,7 +54,7 @@ void zproto_encode(struct zproto_buffer *zb, struct zproto_field_iter *iter, con
 
 //decode
 struct zproto_buffer *zproto_decode_begin(struct zproto *z, const uint8_t *buff, int sz);
-void zproto_decode_end(struct zproto_buffer *zb);
+size_t zproto_decode_end(struct zproto_buffer *zb);
 
 int32_t zproto_decode_record(struct zproto_buffer *zb, struct zproto_field_iter *iter);
 

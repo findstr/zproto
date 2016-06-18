@@ -43,7 +43,6 @@ local function query(self, typ)
         local itype
         local proto
         assert(type(typ) == "number" or type(typ) == "string")
-
         if type(typ) == "number" then
                 itype = true
                 proto = self.tcache[typ]
