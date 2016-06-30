@@ -27,11 +27,12 @@ linux macosx:LDFLAG += -lpthread
 linux:SHARED:=--share -fPIC
 macosx:SHARED=-dynamiclib -fPIC -Wl,-undefined,dynamic_lookup
 
-linux macosx:test zproto.so
+linux macosx:test zproto.so rand.so
 
 zproto.so:zproto.c lzproto.c
 	$(CC) -Ilua53/ $(CCFLAG) $(SHARED) -o $@ $^
-
+rand.so:lrand.c
+	$(CC) -Ilua53/ $(CCFLAG) $(SHARED) -o $@ $^
 test:zproto.c main.c
 	$(CC) -Ilua53/ $(CCFLAG) -o test zproto.c main.c lua53/liblua.a $(LDFLAG)
 
