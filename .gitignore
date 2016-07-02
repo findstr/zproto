@@ -31,4 +31,5 @@
 # Debug files
 *.dSYM/
 
-/lua53
+luabind/lua53
+luabind/test

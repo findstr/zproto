@@ -8,8 +8,8 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-#define MAX     (8 * 1024)
-#define MAXSEG  (64)
+#define MAX     (64 * 1024)
+#define MAXSEG  (128)
 #define MIN(a, b)  (a > b ? b : a)
 
 static int
@@ -33,7 +33,7 @@ randdata(char *buff, int sz)
 }
 
 static int
-lrand(lua_State *L)
+rand2(lua_State *L)
 {
         int i = 0;
         int max = 0;
@@ -52,6 +52,49 @@ lrand(lua_State *L)
         }
         lua_pushlstring(L, buff, ret);
         return 1;
+}
+
+static int
+rand0(lua_State *L)
+{
+        int i = 0;
+        int max = 0;
+        while (max == 0)
+                max = rand() % MAX;
+        char buff[max];
+        for (i = 0; i < max; i++) {
+                buff[i] = rand();
+        }
+        lua_pushlstring(L, buff, max);
+        return 1;
+}
+
+static int
+rand1(lua_State *L)
+{
+        int max = 0;
+        while (max == 0)
+                max = rand() % MAX;
+        char buff[max];
+        memset(buff, max, 0);
+        lua_pushlstring(L, buff, max);
+        return 1;
+}
+
+static int
+lrand(lua_State *L)
+{
+        int type = luaL_checkinteger(L, 1);
+        switch (type) {
+        case 0:
+                return rand0(L);
+        case 1:
+                return rand1(L);
+        case 2:
+                return rand2(L);
+        default:
+                return 0;
+        }
 }
 
 int
