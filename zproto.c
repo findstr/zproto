@@ -520,6 +520,15 @@ queryfield(struct zproto_struct *st, int tag)
         int start = 0;
         int end = st->fieldnr;
         const char *fmt = "queryfield fail, %s struct has no tag:%d\n";
+        if (tag < st->basetag || tag > st->maxtag) {
+                fprintf(stderr, fmt, st->name, tag);
+                return NULL;
+        }
+        if ((st->maxtag - st->basetag + 1) == st->fieldnr) {
+                int i = tag - st->basetag;
+                assert(st->fieldarray[i]->tag == tag);
+                return st->fieldarray[i];
+        }
         while (start < end) {
                 int mid = (start + end) / 2;
                 if (tag == st->fieldarray[mid]->tag)
