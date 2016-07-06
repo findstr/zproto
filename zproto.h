@@ -20,12 +20,13 @@ struct zproto_args {
         int idx;        //array index
         //ENCODE: if 'len' is -1, the array nonexist
         //      otherwise 'len' is length of array
-        //DECODE: the len is the length of array, it may be 0 when the array is empty
+        //DECODE: the len is the length of array, 
+        //it may be 0 when the array is empty
         int len;        //array length
         void *ud;
         const char *name;
         uint8_t *buff;
-        uint8_t buffsz;
+        int      buffsz;
         struct zproto_struct *sttype;
 };
 

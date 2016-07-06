@@ -711,7 +711,7 @@ decode_array(struct zproto_args *args, zproto_cb_t cb)
 {
         int i;
         int err;
-        len_t len;
+        int len;
         uint8_t *buff;
         uint8_t *start;
         int buffsz;
