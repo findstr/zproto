@@ -1,7 +1,7 @@
 local zproto = require "zproto"
 local rand = require "rand"
 
-local protostr = [[
+local protostr1 = [[
 info {
         .name:string 1
         .age:integer 6
@@ -27,9 +27,40 @@ packet 0xfe {
 }
 ]]
 
-local proto = zproto:parse (protostr)
+local protostr2 = [[
+info {
+        .name:string 1
+        .age:integer 6
+        .girl:boolean 9
+        .boy:boolean 10
+        .new:string[] 12
+}
+
+packet 0xfe {
+        phone {
+                .home:integer 1
+                .work:integer 2
+        }
+        dummy {
+        }
+        .phone:phone 1
+        .info:info[] 2
+        .empty:string[] 8
+        .address:string 13
+        .dummy2:string 18
+        .dummy3:string[] 39
+        .luck:integer[] 45
+        .dummy4:dummy 56
+        .new:info[] 57
+}
+]]
+
+
+local proto = zproto:parse (protostr1)
+local newproto = zproto:parse(protostr2)
 
 assert(proto)
+assert(newproto)
 
 local packet = {
         phone = {home=0x123456, work=0x654321},
@@ -39,7 +70,11 @@ local packet = {
                 },
         address = "China.shanghai",
         luck = {1, 3, 9},
-        empty = {}
+        empty = {},
+        new = {
+                {name = "hanmeimei", age=25, girl = true, boy = false, new = {"hnew1", "hnew2"}},
+                {name = "jim", age=27, girl = false , boy = true, new = {"jnew1", "jnew2"}},
+        }
 }
 
 local function print_r(tbl, s, n)
@@ -98,14 +133,29 @@ local function testwire()
         print("+++++++source table")
         print("empty table", packet.empty, #packet.empty)
         print_r(packet)
-        local data = proto:encode(0xfe, packet)
-        data = proto:pack(data)
-        data = proto:unpack(data)
-        local unpack = proto:decode("packet", data)
-        print("------dest table")
+        local data = newproto:encode(0xfe, packet)
+        data = newproto:pack(data)
+        data = newproto:unpack(data)
+        local unpack = newproto:decode("packet", data)
+        print("------dest table", unpack)
         print("empty table", unpack.empty, #unpack.empty)
         print_r(unpack)
         print("=========stop test wire=============")
+end
+
+local function testcompatible(name, e, d)
+        print(string.format("=========begin test compatible %s =============", name))
+        print("+++++++source table")
+        print("empty table", packet.empty, #packet.empty)
+        print_r(packet)
+        local data = e:encode(0xfe, packet)
+        data = e:pack(data)
+        data = d:unpack(data)
+        local unpack = d:decode("packet", data)
+        print("------dest table")
+        print("empty table", unpack.empty, #unpack.empty)
+        print_r(unpack)
+        print(string.format("=========stop test compatible %s =============", name))
 end
 
 local testcount = 512 * 512
@@ -173,8 +223,10 @@ end
 --test decode defend
 --test unpack defend
 
-testproto()
+--testproto()
 testwire()
+testcompatible("old", proto, newproto)
+testcompatible("new", newproto, proto)
 testpackunpack()
 testdecodedefend()
 testunpackdefend()

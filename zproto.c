@@ -519,11 +519,8 @@ queryfield(struct zproto_struct *st, int tag)
 {
         int start = 0;
         int end = st->fieldnr;
-        const char *fmt = "queryfield fail, %s struct has no tag:%d\n";
-        if (tag < st->basetag || tag > st->maxtag) {
-                fprintf(stderr, fmt, st->name, tag);
+        if (tag < st->basetag || tag > st->maxtag)
                 return NULL;
-        }
         if ((st->maxtag - st->basetag + 1) == st->fieldnr) {
                 int i = tag - st->basetag;
                 assert(st->fieldarray[i]->tag == tag);
@@ -538,7 +535,6 @@ queryfield(struct zproto_struct *st, int tag)
                 else
                         start = mid + 1;
         }
-        fprintf(stderr, fmt, st->name, tag);
         return NULL;
 }
 
@@ -617,15 +613,17 @@ zproto_encode(struct zproto_struct *st, uint8_t *buff, int sz, zproto_cb_t cb, v
 {
         int i;
         int err;
+        len_t   *total;
         hdr_t   *len;
         hdr_t   *tag;
         uint8_t *body;
         int last = st->basetag - 1; //tag now
         int fcnt = st->fieldnr; //field count
-        size_t hdrsz= (fcnt + 1) * sizeof(hdr_t);
+        size_t hdrsz= (fcnt + 1) * sizeof(hdr_t) + sizeof(len_t);
         
         CHECK_OOM(sz, hdrsz);
-        len = (hdr_t *)buff;
+        total = (len_t *)buff;
+        len = (hdr_t *)(total + 1);
         tag = len + 1;
         buff += hdrsz;
         sz -= hdrsz;
@@ -661,7 +659,8 @@ zproto_encode(struct zproto_struct *st, uint8_t *buff, int sz, zproto_cb_t cb, v
         *len = (tag - len) - 1; //length used one byte
         if ((uintptr_t)tag != (uintptr_t)body)
                 memmove(tag, body, buff - body);
-        return (buff - body) + ((uint8_t *)tag - (uint8_t *)len);
+        *total = (buff - body) + ((uint8_t *)tag - (uint8_t *)len);
+        return sizeof(len_t) + *total;
 }
 
 
@@ -749,13 +748,18 @@ zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t
         int i;
         int err;
         int last;
+        len_t   total;
         hdr_t   len;
         hdr_t   *tag;
         int     hdrsz;
-        const uint8_t *start = buff;
         
-        CHECK_VALID(sz, sizeof(hdr_t))    //header size
+        CHECK_VALID(sz, sizeof(hdr_t) + sizeof(len_t))    //header size
         last = st->basetag - 1; //tag now
+        total = *(len_t *)buff;
+        buff += sizeof(len_t);
+        sz -= sizeof(len_t);
+        CHECK_VALID(sz, total)
+        sz = total;
         len = *(hdr_t *)buff;
         buff += sizeof(hdr_t);
         sz -=  sizeof(hdr_t);
@@ -771,7 +775,7 @@ zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t
                 int t = *tag + last + 1;
                 f = queryfield(st, t);
                 if (f == NULL)
-                        return ZPROTO_ERROR;
+                        break;
                 fill_args(&args, f, ud);
                 args.buff = (uint8_t *)buff;
                 args.buffsz = sz;
@@ -787,7 +791,7 @@ zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t
                 tag++;
                 last = t;
         }
-        return buff - start;
+        return total + sizeof(len_t);
 }
 
 //////////encode/decode

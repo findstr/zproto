@@ -26,7 +26,7 @@ struct zproto_args {
         void *ud;
         const char *name;
         uint8_t *buff;
-        int      buffsz;
+        size_t  buffsz;
         struct zproto_struct *sttype;
 };
 
