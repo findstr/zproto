@@ -1,0 +1,11 @@
+packet 0xfe {
+        phone {
+                .home:integer 1
+                .work:integer 2
+        }
+        .phone:phone 1
+        .address:string 3
+        .luck:integer[] 4
+}
+
+
