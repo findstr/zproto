@@ -153,12 +153,14 @@ header(const char *name, struct zproto *z)
         }
         st = zproto_next(z, NULL);
         fp = fopen(path.c_str(), "wb+");
+        fprintf(fp, "#ifndef __%s_h\n#define __%s_h\n", name, name);
         fprintf(fp, "#include \"zprotowire.h\"\n");
         fprintf(fp, "namespace %s {\n\n", name);
         fprintf(fp, "using namespace zprotobuf;\n\n");
         dumpst(fp, z, st);
         wiretree(fp);
         fprintf(fp, "\n}\n");
+        fprintf(fp, "#endif\n");
         fclose(fp);
 }
 
