@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <vector>
 #include <string>
 #include <unordered_set>
@@ -123,10 +124,11 @@ to_string(struct zproto_args *args)
 static std::string inline
 fill_struct(struct zproto_args *args)
 {
-        char buff[256];
+        char buff[1024];
         const char *fmt =
 "        case %d:\n"
 "                return %s._encode(args->buff, args->buffsz, args->sttype);\n";
+
         const char *afmt = 
 "        case %d:\n"
 "                if (args->idx >= (int)%s.size()) {\n"
@@ -135,10 +137,28 @@ fill_struct(struct zproto_args *args)
 "                }\n"
 "                return %s[args->idx]._encode(args->buff, args->buffsz, args->sttype);\n";
 
-        if (args->idx >= 0)
-                snprintf(buff, 256, afmt, args->tag, args->name, args->name);
-        else
-                snprintf(buff, 256, fmt, args->tag, args->name);
+        const char *mfmt = 
+"        case %d:\n"
+"                if (args->idx == 0) {\n"
+"                        int i = 0;\n"
+"                        maptoarray.clear();\n"
+"                        for (auto &iter:%s)\n"
+"                                maptoarray[i] = &iter.second;\n"
+"                }\n"
+"                if (args->idx >= (int)maptoarray.size()) {\n"
+"                        args->len = args->idx;\n"
+"                        return ZPROTO_NOFIELD;\n"
+"                }\n"
+"                return ((struct %s *)maptoarray[args->idx])->_encode(args->buff, args->buffsz, args->sttype);\n";
+
+        if (args->maptag) {
+                assert(args->idx >= 0);
+                snprintf(buff, 1024, mfmt, args->tag, args->name, zproto_name(args->sttype));
+        } else if (args->idx >= 0) {
+                snprintf(buff, 1024, afmt, args->tag, args->name, args->name);
+        } else {
+                snprintf(buff, 1024, fmt, args->tag, args->name);
+        }
         return buff;
 }
 
@@ -155,11 +175,28 @@ to_struct(struct zproto_args *args)
 "                if (args->len == 0)\n"
 "                        return 0;\n"
 "                %s.resize(args->idx + 1);"
-"                %s[args->idx]._decode(args->buff, args->buffsz, args->sttype);\n";
-        if (args->idx >= 0)
+"                return %s[args->idx]._decode(args->buff, args->buffsz, args->sttype);\n";
+
+        const char *mfmt =
+"        case %d: {\n"
+"                int ret;\n"
+"                struct %s _tmp;\n"
+"                assert(args->idx >= 0);\n"
+"                if (args->len == 0)\n"
+"                        return 0;\n"
+"                ret = _tmp._decode(args->buff, args->buffsz, args->sttype);\n"
+"                %s[_tmp.%s] = std::move(_tmp);\n"
+"                return ret;\n"
+"                }\n";
+
+        if (args->maptag) {
+                assert(args->idx >= 0);
+                snprintf(buff, 512, mfmt, args->tag, zproto_name(args->sttype), args->name, args->mapname);
+        } else if (args->idx >= 0) {
                 snprintf(buff, 512, afmt, args->tag, args->name, args->name);
-        else
+        } else {
                 snprintf(buff, 512, fmt, args->tag, args->name);
+        }
         return buff;
 }
 

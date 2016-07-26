@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <vector>
 #include <string>
 #include <unordered_set>
@@ -65,6 +66,34 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
         return ;
 }
 
+struct find_field_ud {
+        int tag;
+        std::string type;
+};
+
+static int
+find_field_type(struct zproto_args *args)
+{
+        struct find_field_ud *ud = (struct find_field_ud *)args->ud;
+        if (ud->tag == args->tag) {
+                switch (args->type) {
+                case ZPROTO_STRING:
+                        ud->type = "std::string";
+                        break;
+                case ZPROTO_BOOLEAN:
+                        ud->type = "uint32_t";
+                        break;
+                case ZPROTO_INTEGER:
+                        ud->type = "uint32_t";
+                        break;
+                default:
+                        assert(!"unsupport key type of std::map");
+                        break;
+                }
+        }
+        return 0;
+}
+
 static int 
 prototype_cb(struct zproto_args *args)
 {
@@ -74,10 +103,20 @@ prototype_cb(struct zproto_args *args)
         std::string type;
         std::string subtype;
         
-        if (args->idx >= 0)
+        if (args->maptag) {
+                std::string str;
+                assert(args->idx >= 0);
+                struct find_field_ud fud;
+                fud.tag = args->maptag;
+                zproto_travel(args->sttype, find_field_type, &fud);
+                assert(fud.type != "");
+                str = "std::unordered_map<" + fud.type + ", %s> %s;\n";
+                type = tab(ud->level) + str;
+        } else if(args->idx >= 0) {
                 type = tab(ud->level) + "std::vector<%s> %s;\n";
-        else
+        } else {
                 type = tab(ud->level) + "%s %s;\n";
+        }
 
         switch (args->type) {
         case ZPROTO_STRUCT:

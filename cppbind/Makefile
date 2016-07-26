@@ -1,4 +1,4 @@
-zproto:zproto.o
+zproto:zproto.o header.cpp body.cpp
 	g++ -Wall -g -std=c++0x -I../ -g -o zproto proto.cpp header.cpp body.cpp zproto.o
 
 test:zproto.o

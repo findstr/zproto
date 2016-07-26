@@ -29,6 +29,7 @@ struct zproto_field {
         int                     type;
         const char              *name;
         struct zproto_struct    *seminfo;
+        struct zproto_field     *mapkey;
         struct zproto_field     *next;
 };
 
@@ -177,6 +178,18 @@ find_record(struct zproto *z, struct zproto_struct *proto, const char *name)
         return find_record(z, proto->parent, name);
 }
 
+static struct zproto_field *
+find_field(struct zproto *z, struct zproto_struct *proto, const char *name)
+{
+        struct zproto_field *tmp;
+        (void)z;
+        for (tmp = proto->field; tmp; tmp = tmp->next) {
+                if (strcmp(tmp->name, name) == 0)
+                        return tmp;
+        }
+        return NULL;
+}
+
 static void
 unique_record(struct zproto *z, struct zproto_struct *proto, const char *name)
 {
@@ -195,17 +208,14 @@ static void
 unique_field(struct zproto *z, struct zproto_struct *proto, const char *name, int tag)
 {
         struct zproto_field *tmp;
-
         if (tag <= 0) {
                 fprintf(stderr, "line:%d syntax error: tag must great then 0\n", z->linenr);
                 THROW(z);
         }
-
         if (tag > 65535) {
                 fprintf(stderr, "line:%d syntax error: tag must less then 655535\n", z->linenr);
                 THROW(z);
         }
-
         for (tmp = proto->field; tmp; tmp = tmp->next) {
                 if (strcmp(tmp->name, name) == 0) {
                         fprintf(stderr, "line:%d syntax error:has already define a field named:%s\n", z->linenr, name);
@@ -222,16 +232,32 @@ unique_field(struct zproto *z, struct zproto_struct *proto, const char *name, in
 }
 
 static int
-strtotype(struct zproto *z, struct zproto_struct *proto, const char *type, struct zproto_struct **seminfo)
+strtotype(struct zproto *z, struct zproto_struct *proto, const char *type, struct zproto_struct **seminfo, char mapkey[64])
 {
         int ztype = 0;
         int sz = strlen(type);
+        int mapidx = -1;
         *seminfo = NULL;
-        if (strcmp(&type[sz - 2], "[]") == 0) {
+        mapkey[0] = 0;
+        if (type[sz-1] == ']') {//array
+                int i;
+                int len;
+                for (i = sz - 2; i >= 0; i--) {
+                        if (type[i] == '[') {
+                                mapidx = i + 1;
+                                break;
+                        }
+                }
+                if (i < 0) {
+                        fprintf(stderr, "line:%d syntax error:match none '['\n", z->linenr);
+                        THROW(z);
+                }
                 ztype |= ZPROTO_ARRAY;
-                sz -= 2;
+                len = sz - 1 - mapidx;
+                sz = i;
+                assert(len < 63 && len >= 0);
+                strncpy(mapkey, &type[mapidx], len);
         }
-
         if (strncmp(type, "boolean", sz) == 0) {
                 ztype |= ZPROTO_BOOLEAN;
         } else if (strncmp(type, "integer", sz) == 0) {
@@ -249,7 +275,6 @@ strtotype(struct zproto *z, struct zproto_struct *proto, const char *type, struc
                 }
                 ztype |= ZPROTO_STRUCT;
         }
-
         return ztype;
 }
 
@@ -303,7 +328,9 @@ field(struct zproto *z, struct zproto_struct *proto)
         int n;
         char field[64];
         char type[64];
+        char mapkey[64];
         struct zproto_field *f;
+        struct zproto_field *key;
         skip_space(z);
         const char *fmt = ".%64[a-zA-Z0-9_]:%64[]a-zA-Z0-9\[]%*[' '|'\t']%d";
         n = sscanf(z->data, fmt, field, type, &tag);
@@ -316,14 +343,42 @@ field(struct zproto *z, struct zproto_struct *proto)
         if (proto->field && tag <= proto->field->tag) {
                 fmt = "line:%d synax error: tag value must be defined ascending\n";
                 fprintf(stderr, fmt, z->linenr);
+                THROW(z);
         }
         proto->maxtag = tag;
         f = (struct zproto_field *)pool_alloc(z, sizeof(*f));
+        f->mapkey = NULL;
         f->next = proto->field;
         proto->field = f;
         f->tag = tag;
         f->name = pool_dupstr(z, field);
-        f->type = strtotype(z, proto, type, &f->seminfo);
+        f->type = strtotype(z, proto, type, &f->seminfo, mapkey);
+        if (mapkey[0] == '\0')
+                return;
+        //map index can only be struct array
+        assert(f->type & ZPROTO_ARRAY);
+        if ((f->type & ZPROTO_TYPE) != ZPROTO_STRUCT) {
+                fmt = "line:%d synax error: only struct array can be specify map index\n";
+                fprintf(stderr, fmt, z->linenr);
+                THROW(z);
+        }
+        key = find_field(z, f->seminfo, mapkey);
+        if (key == NULL) {
+                fmt = "line:%d synax error: struct %s has no field:%s\n";
+                fprintf(stderr, fmt, z->linenr, f->seminfo->name, mapkey);
+                THROW(z);
+        }
+        if (key->seminfo) {
+                fmt = "line:%d synax error: struct type field '%s' can't be mapkey\n";
+                fprintf(stderr, fmt, z->linenr, key->name);
+                THROW(z);
+        }
+        if (key->type & ZPROTO_ARRAY) {
+                fmt = "line:%d synax error: array field '%s' can't be mapkey\n";
+                fprintf(stderr, fmt, z->linenr, f->name);
+                THROW(z);
+        }
+        f->mapkey = key;
         return ;
 }
 
@@ -496,6 +551,13 @@ fill_args(struct zproto_args *args, struct zproto_field *f, void *ud)
         args->idx = -1;
         args->len = -1;
         args->ud = ud;
+        if (f->mapkey) {
+                args->maptag = f->mapkey->tag;
+                args->mapname = f->mapkey->name;
+        } else {
+                args->maptag = 0;
+                args->mapname = NULL;
+        }
         return;
 }
 

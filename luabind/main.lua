@@ -44,14 +44,14 @@ packet 0xfe {
         dummy {
         }
         .phone:phone 1
-        .info:info[] 2
+        .info:info[name] 2
         .empty:string[] 8
         .address:string 13
         .dummy2:string 18
         .dummy3:string[] 39
         .luck:integer[] 45
         .dummy4:dummy 56
-        .new:info[] 57
+        .new:info[name] 57
 }
 ]]
 

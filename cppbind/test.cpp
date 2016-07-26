@@ -11,8 +11,8 @@ int main()
         test_zproto::packet pk;
         test_zproto::packet pk2;
         test_zproto::seralizer *S = new test_zproto::seralizer;
-        pk.phone.home = 0x3389;
-        pk.phone.work = 0x4498;
+        pk.phone[1].home = 0x3389;
+        pk.phone[1].work = 0x4498;
         pk.address = "ShangHai";
         pk.luck.push_back(3);
         pk.luck.push_back(7);
@@ -25,8 +25,10 @@ int main()
 
         sz = S->decode(pk2, dat);
         printf("decode size:%d\n", sz);
-        printf("packet::phone::home:0x%x\n", pk2.phone.home);
-        printf("packet::phone::work:0x%x\n", pk2.phone.work);
+        for (auto &iter:pk2.phone) {
+                printf("packet::phone[%x]::home:0x%x\n", iter.first, iter.second.home);
+                printf("packet::phone[%x]::work:0x%x\n", iter.first, iter.second.work);
+        }
         printf("packet::address:%s\n", pk2.address.c_str());
         printf("packet::luck size:%lu\n", pk2.luck.size());
         for (size_t i = 0; i < pk2.luck.size(); i++)
