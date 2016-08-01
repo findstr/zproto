@@ -105,7 +105,7 @@ wiretree::encode(const wire &w, std::string &dat)
                         expand();
                         continue;
                 }
-                dat.assign((char *)buff, buffsz);
+                dat.assign((char *)buff, sz);
                 return sz;
         }
         //never come here
