@@ -23,7 +23,7 @@ int main()
                 printf("%x ", (uint8_t)dat[i]);
         printf("\n");
 
-        sz = S->decode(pk2, dat);
+        sz = test_zproto::seralizer::instance().decode(pk2, dat);
         printf("decode size:%d\n", sz);
         for (auto &iter:pk2.phone) {
                 printf("packet::phone[%x]::home:0x%x\n", iter.first, iter.second.home);

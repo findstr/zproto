@@ -350,7 +350,13 @@ wiretree(FILE *fp, const char *proto)
         fprintf(fp,
 "seralizer::seralizer()\n"
 "        :wiretree(def)\n"
-"{}\n");
+"{}\n"
+"seralizer &\n"
+"seralizer::instance()\n"
+"{\n"
+"        static seralizer *inst = new seralizer();\n"
+"        return *inst;\n"
+"}\n");
 }
 
 

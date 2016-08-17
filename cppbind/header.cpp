@@ -174,6 +174,7 @@ wiretree(FILE *fp)
 "class seralizer:public wiretree {\n"
 "public:\n"
 "        seralizer();\n"
+"        static seralizer &instance();\n"
 "};\n");
 }
 
