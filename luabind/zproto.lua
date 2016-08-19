@@ -56,7 +56,7 @@ local function query(self, typ)
 
         assert(self.proto)
         local proto, tag = engine.query(self.proto, typ)
-        assert(proto)
+        assert(proto, typ)
         if itype then
                 self.tcache[typ] = proto
         else 
@@ -68,9 +68,9 @@ end
 
 function zproto:encode(typ, packet)
         local record = query(self, typ)
-        assert(record)
-        assert(typ)
-        assert(packet)
+	assert(typ, "packet type nil")
+	assert(packet, "packet body nil")
+        assert(record, "has no struct" .. typ)
         return engine.encode(record, packet)
 end
 

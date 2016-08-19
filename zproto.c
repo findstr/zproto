@@ -390,11 +390,14 @@ record(struct zproto *z, struct zproto_struct *proto, int protocol)
         int tag = 0;
         char name[64];
         const char *fmt;
-        struct zproto_struct *new = (struct zproto_struct *)pool_alloc(z, sizeof(*new));
+        struct zproto_struct *new;
+        skip_space(z);
+        if (eos(z))
+                return;
+        new = (struct zproto_struct *)pool_alloc(z, sizeof(*new));
         memset(new, 0, sizeof(*new));
         new->next = proto->child;
         new->parent = proto;
-        skip_space(z);
         if (protocol == 0) {
                 err = sscanf(z->data, "%64s", name);
         } else {

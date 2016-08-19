@@ -112,30 +112,24 @@ encode_field(struct zproto_args *args)
         const char *name = args->name;
         switch (args->type) {
         case ZPROTO_BOOLEAN: {
-                if (lua_type(L, -1) != LUA_TBOOLEAN) {
-                        fprintf(stderr, "encode data:need boolean field:%s\n", name);
-                        return ZPROTO_ERROR;
-                }
+                if (lua_type(L, -1) != LUA_TBOOLEAN)
+                        return luaL_error(L, "encode data:need boolean field:%s\n", name);
                 CHECK_OOM(args->buffsz, sizeof(uint8_t))
                 int8_t d = lua_toboolean(L, -1);
                 uint8(args->buff) = d;
                 return sizeof(uint8_t);
         }
         case ZPROTO_INTEGER: {
-                if (lua_type(L, -1) != LUA_TNUMBER) {
-                        fprintf(stderr, "encode_data:need integer field:%s\n", name);
-                        return ZPROTO_ERROR;
-                }
+                if (lua_type(L, -1) != LUA_TNUMBER)
+                        return luaL_error(L, "encode_data:need integer field:%s\n", name);
                 CHECK_OOM(args->buffsz, sizeof(uint32_t))
                 int32_t d = luaL_checkinteger(L, -1);
                 uint32(args->buff) = (uint32_t)d;
                 return sizeof(uint32_t);
         }
         case ZPROTO_STRING: {
-                if (lua_type(L, -1) != LUA_TSTRING) {
-                        fprintf(stderr, "encode_data:need string field:%s\n", name);
-                        return ZPROTO_ERROR;
-                }
+                if (lua_type(L, -1) != LUA_TSTRING)
+                        return luaL_error(L, "encode_data:need string field:%s\n", name);
                 size_t sz;
                 const char *d = luaL_checklstring(L, -1, &sz);
                 CHECK_OOM(args->buffsz, sz)
@@ -143,18 +137,15 @@ encode_field(struct zproto_args *args)
                 return sz;
         }
         case ZPROTO_STRUCT: {
-                if (lua_type(L, -1) != LUA_TTABLE) {
-                        fprintf(stderr, "encode_data:need table field:%s\n", name);
-                        return ZPROTO_ERROR;
-                }
+                if (lua_type(L, -1) != LUA_TTABLE)
+                        return luaL_error(L, "encode_data:need table field:%s\n", name);
                 struct lencode_ud ud;
                 ud.level = eud->level + 1;
                 ud.L = eud->L;
                 return zproto_encode(args->sttype, args->buff, args->buffsz, encode_table, &ud);
         }
         default:
-                fprintf(stderr, "encode_data, unkonw field type:%d\n", args->type);
-                return ZPROTO_ERROR;
+                return luaL_error(L, "encode_data, unkonw field type:%d\n", args->type);
         }
 }
 
@@ -193,8 +184,7 @@ encode_table(struct zproto_args *args)
         lua_State *L = eud->L;
         if (eud->level >= MAX_RECURSIVE) {
                 const char *fmt = "encode_table too deep:%d stkidx:%d \n"; 
-                fprintf(stderr, fmt, eud->level, lua_gettop(L));
-                return ZPROTO_ERROR;
+                return luaL_error(L, fmt, eud->level, lua_gettop(L));
         }
         if (args->idx >= 0) {
                 sz = encode_array(args);
@@ -248,7 +238,7 @@ lencode(lua_State *L)
                         data = resizebuffer(L, datasz);
                         continue;
                 }
-                assert(sz == ZPROTO_ERROR || sz > 0);
+                assert(sz > 0);
                 break;
         }
         lua_settop(L, top);

@@ -55,8 +55,11 @@ int main(int argc, char *argv[])
         fp = fopen(argv[1], "rb");
         assert(fp);
         err = fread(proto, st.st_size, 1, fp);
-        assert(err == 1);
         fclose(fp);
+        if (err == 0) {
+                delete []proto;
+                return 0;
+        }
         proto[st.st_size] = 0;
 
         z = zproto_create();
@@ -69,7 +72,7 @@ int main(int argc, char *argv[])
         name = strip_path(argv[1]);
         header(name.c_str(), z);
         body(name.c_str(), proto, z);
-        delete proto;
+        delete []proto;
         zproto_free(z);
         return 0;
 }
