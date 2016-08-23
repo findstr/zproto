@@ -125,6 +125,8 @@ next_line(struct zproto *z)
         const char *n = z->data;
         while (*n != '\n' && *n)
                 n++;
+        if (*n == '\n')
+                n++;
         z->linenr++;
         z->data = n;
         skip_space(z);
@@ -333,7 +335,7 @@ field(struct zproto *z, struct zproto_struct *proto)
         struct zproto_field *f;
         struct zproto_field *key;
         skip_space(z);
-        const char *fmt = ".%64[a-zA-Z0-9_]:%64[]a-zA-Z0-9\[]%*[' '|'\t']%d";
+        const char *fmt = ".%64[a-zA-Z0-9_]:%64[]a-zA-Z0-9\[_]%*[' '|'\t']%d";
         n = sscanf(z->data, fmt, field, type, &tag);
         if (n != 3) {
                 fmt = "line:%d synax error: expect field definition, but found:%s\n";
