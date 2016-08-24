@@ -803,7 +803,7 @@ decode_array(struct zproto_args *args, zproto_cb_t cb)
                                 return err;
                         assert(err > 0);
                         buff += err;
-                        buffsz += err;
+                        buffsz -= err;
                         args->idx++;
                 }
         }
