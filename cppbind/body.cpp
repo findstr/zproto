@@ -348,13 +348,13 @@ wiretree(FILE *fp, const char *proto)
         hex += "\";\n";
         fprintf(fp, "%s\n", hex.c_str());
         fprintf(fp,
-"seralizer::seralizer()\n"
+"serializer::serializer()\n"
 "        :wiretree(def)\n"
 "{}\n"
-"seralizer &\n"
-"seralizer::instance()\n"
+"serializer &\n"
+"serializer::instance()\n"
 "{\n"
-"        static seralizer *inst = new seralizer();\n"
+"        static serializer *inst = new serializer();\n"
 "        return *inst;\n"
 "}\n");
 }

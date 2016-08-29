@@ -171,10 +171,10 @@ static void
 wiretree(FILE *fp)
 {
         fprintf(fp, "%s",
-"class seralizer:public wiretree {\n"
+"class serializer:public wiretree {\n"
 "public:\n"
-"        seralizer();\n"
-"        static seralizer &instance();\n"
+"        serializer();\n"
+"        static serializer &instance();\n"
 "};\n");
 }
 
