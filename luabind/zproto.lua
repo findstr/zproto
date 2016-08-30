@@ -45,6 +45,7 @@ local function query(self, typ)
         assert(type(typ) == "number" or type(typ) == "string")
         if type(typ) == "number" then
                 itype = true
+                assert(typ > 0, "protocol must be large then 0")
                 proto = self.tcache[typ]
         elseif type(typ) == "string" then
                 itype = false
