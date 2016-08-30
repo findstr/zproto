@@ -48,6 +48,7 @@ local function query(self, typ)
                 assert(typ > 0, "protocol must be large then 0")
                 proto = self.tcache[typ]
         elseif type(typ) == "string" then
+                assert(#typ <= 32, "type name length less then 32 will be more effective")
                 itype = false
                 proto = self.ncache[typ]
         end
@@ -82,7 +83,7 @@ function zproto:querytag(typ)
                 query(self, typ)
                 tag = self.nametag[typ]
         end
-        assert(tag)
+        assert(tag > 0, "only can query proto")
         return tag
 end
 
