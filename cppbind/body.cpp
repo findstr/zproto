@@ -6,6 +6,7 @@
 #include "zproto.hpp"
 
 static std::unordered_set<struct zproto_struct *>      protocol;
+static std::unordered_set<struct zproto_struct *>      defined;
 
 struct stmt_args {
         std::string                     base;
@@ -268,6 +269,7 @@ formatst(struct zproto_struct *st, struct stmt_args &newargs)
         newargs.stmts.insert(newargs.stmts.end(), newargs.decodestm.begin(),
                         newargs.decodestm.end());
 
+        defined.insert(st);
         return ;
 }
 
@@ -281,7 +283,7 @@ prototype_cb(struct zproto_args *args)
         
         switch (args->type) {
         case ZPROTO_STRUCT:
-                if (protocol.count(args->sttype) == 0) { //protocol define
+                if (protocol.count(args->sttype) == 0 && defined.count(args->sttype) == 0) { //protocol define
                         newargs.base = ud->base;
                         newargs.base += "::";
                         newargs.base += zproto_name(args->sttype);

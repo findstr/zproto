@@ -7,6 +7,7 @@
 #include "header.h"
 
 static std::unordered_set<struct zproto_struct *>      protocol;
+static std::unordered_set<struct zproto_struct *>      defined;
 
 struct prototype_args {
         int level;
@@ -42,6 +43,7 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
         std::string t1 = tab(newargs.level);
         std::string t2 = tab(newargs.level - 1);
         char buff[2048];
+
         zproto_travel(st, prototype_cb, &newargs);
         //subtype
         newargs.fields.insert(
@@ -63,6 +65,7 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
                 newargs.fields.end(),
                 t2 + "};\n"
                 );
+        defined.insert(st);
         return ;
 }
 
@@ -120,7 +123,7 @@ prototype_cb(struct zproto_args *args)
 
         switch (args->type) {
         case ZPROTO_STRUCT:
-                if (protocol.count(args->sttype) == 0) { //protocol define
+                if (protocol.count(args->sttype) == 0 && defined.count(args->sttype) == 0) { //protocol define
                         newargs.level = ud->level + 1;
                         formatst(args->sttype, newargs);
                         ud->type.insert(ud->type.end(), newargs.fields.begin(), newargs.fields.end());
