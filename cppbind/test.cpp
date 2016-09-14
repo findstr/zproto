@@ -13,6 +13,8 @@ int main()
         test_zproto::serializer *S = new test_zproto::serializer;
         pk.phone[1].home = 0x3389;
         pk.phone[1].work = 0x4498;
+        pk.phone[2].home = 0x3399;
+        pk.phone[2].work = 0x5599;
         pk.address = "ShangHai";
         pk.luck.push_back(3);
         pk.luck.push_back(7);

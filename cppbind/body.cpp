@@ -144,7 +144,7 @@ fill_struct(struct zproto_args *args)
 "                        int i = 0;\n"
 "                        maptoarray.clear();\n"
 "                        for (auto &iter:%s)\n"
-"                                maptoarray[i] = &iter.second;\n"
+"                                maptoarray[i++] = &iter.second;\n"
 "                }\n"
 "                if (args->idx >= (int)maptoarray.size()) {\n"
 "                        args->len = args->idx;\n"
