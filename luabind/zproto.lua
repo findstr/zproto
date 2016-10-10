@@ -72,7 +72,6 @@ function zproto:encode(typ, packet)
         local record = query(self, typ)
 	assert(typ, "packet type nil")
 	assert(packet, "packet body nil")
-        assert(record, "has no struct" .. typ)
         return engine.encode(record, packet)
 end
 
