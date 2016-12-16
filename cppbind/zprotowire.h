@@ -30,6 +30,7 @@ public:
 	~wiretree();
 	int encode(const wire &w, std::string &dat);
 	int decode(wire &w, const std::string &dat);
+	int decode(wire &w, const uint8_t *dat, size_t datasz);
 private:
 	void expand();
 	struct zproto_struct *query(const char *name);

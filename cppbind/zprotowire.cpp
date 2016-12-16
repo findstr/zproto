@@ -115,11 +115,15 @@ wiretree::encode(const wire &w, std::string &dat)
 int
 wiretree::decode(wire &w, const std::string &dat)
 {
+	return decode(w, (uint8_t *)dat.data(), dat.size());
+}
+
+int
+wiretree::decode(wire &w, const uint8_t *dat, size_t datasz)
+{
 	int sz;
-	uint8_t *data = (uint8_t *)dat.data();
-	int datasz = dat.size();
 	struct zproto_struct *st = query(w._name());
-	sz = w._decode(data, datasz, st);
+	sz = w._decode((uint8_t *)dat, datasz, st);
 	return sz;
 }
 
