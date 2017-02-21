@@ -344,7 +344,7 @@ wiretree(FILE *fp, const char *proto)
 	char buff[8];
 	std::string hex = "const char *def = \"";
 	for (i = 0; proto[i]; i++) {
-		snprintf(buff, 8, "\\x%x", proto[i]);
+		snprintf(buff, 8, "\\x%x", (uint8_t)proto[i]);
 		hex += buff;
 	}
 	hex += "\";\n";
