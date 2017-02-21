@@ -1,6 +1,8 @@
 # zproto
 a simple protocol buffer for lua
- 
+
+## Description
+
 ####the protocol syntax defined like this:
 
 	#comments line
@@ -37,3 +39,17 @@ a simple protocol buffer for lua
 			.field1:integer 1
 			...
 		}
+
+
+##Cppbind
+
+The code in the cppbind folder is a simply C++ binding of zproto.
+
+The cppbind code also provide a simple test code and you can run it as follow:
+
+- run 'make' to build a executable file named 'zproto', 
+	the 'zproto' file can be used to generate c++ bind code from \*.zproto file
+- run './zproto test.zproto' to generate c++ bind code for test.zproto protocol
+- run 'make test' to build a test program
+- run './test' to run the test code.
+
