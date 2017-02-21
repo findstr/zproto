@@ -175,7 +175,7 @@ to_struct(struct zproto_args *args)
 "		 assert(args->idx >= 0);\n"
 "		 if (args->len == 0)\n"
 "			 return 0;\n"
-"		 %s.resize(args->idx + 1);"
+"		 %s.resize(args->idx + 1);\n"
 "		 return %s[args->idx]._decode(args->buff, args->buffsz, args->sttype);\n";
 
 	const char *mfmt =
