@@ -93,7 +93,7 @@ wiretree::query(const char *name)
 }
 
 int
-wiretree::encode(const wire &w, std::string &dat)
+wiretree::encodecheck(const wire &w)
 {
 	int sz;
 	struct zproto_struct *st = query(w._name());
@@ -105,11 +105,31 @@ wiretree::encode(const wire &w, std::string &dat)
 			expand();
 			continue;
 		}
-		dat.assign((char *)buff, sz);
 		return sz;
 	}
 	//never come here
 	return ZPROTO_ERROR;
+}
+
+int
+wiretree::encode(const wire &w, const uint8_t **data)
+{
+	int sz;
+	sz = encodecheck(w);
+	if ((sz >= 0) && data)
+		*data = buff;
+	return sz;
+}
+
+int
+wiretree::encode(const wire &w, std::string &dat)
+{
+	int sz;
+	dat.clear();
+	sz = encodecheck(w);
+	if (sz > 0)
+		dat.assign((char *)buff, sz);
+	return sz;
 }
 
 int

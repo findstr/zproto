@@ -1,16 +1,29 @@
-zproto:zproto.o header.cpp body.cpp
-	g++ -Wall -g -std=c++0x -I../ -g -o zproto proto.cpp header.cpp body.cpp zproto.o
+CC=g++
+CCFLAG=-Wall -g -std=c++0x -I../
 
-test:zproto.o
-	g++ -Wall -g -std=c++0x -I../ -g -o test test.cpp test_zproto.cc zprotowire.cpp zproto.o
+zproto:zproto.o header.cpp body.cpp
+	$(CC) $(CCFLAG) -o zproto proto.cpp header.cpp body.cpp zproto.o
+
+test:zproto.o zprotowire.o
+	$(CC) $(CCFLAG) -o test test.cpp test_zproto.cc zprotowire.o zproto.o
+
+libs: zprotowire.o zproto.o
+	ar rcs libzproto.a $^
+
+
+
+zprotowire.o:zprotowire.cpp
+	$(CC) $(CCFLAG) -c $<
 
 zproto.o:../zproto.c
 	gcc -Wall -g -c ../zproto.c
 
+
+
 clean:
 	-rm zproto
 	-rm test
-	-rm zproto.o
+	-rm *.o
 	-rm *.cc
 	-rm *.hpp
 

@@ -5,38 +5,55 @@
 #include <unordered_set>
 #include "test_zproto.hpp"
 
+static void
+print_hex(const uint8_t *buf, size_t sz)
+{
+	for (size_t i = 0; i < sz; i++)
+		printf("%x ", buf[i]);
+	printf("\n");
+}
+
+static void
+print_struct(const test_zproto::packet &pk)
+{
+	for (auto &iter:pk.phone) {
+		printf("packet::phone[%x]::home:0x%x\n", iter.first, iter.second.home);
+		printf("packet::phone[%x]::work:0x%x\n", iter.first, iter.second.work);
+	}
+	printf("packet::address:%s\n", pk.address.c_str());
+	printf("packet::luck size:%lu\n", pk.luck.size());
+	for (size_t i = 0; i < pk.luck.size(); i++)
+		printf("%d ", pk.luck[i]);
+	printf("\n");
+}
+
 int main()
 {
 	std::string dat;
+	const uint8_t *datbuf;
+	int datsize;
 	test_zproto::packet pk;
 	test_zproto::packet pk2;
-	test_zproto::serializer *S = new test_zproto::serializer;
+	test_zproto::packet pk3;
+	test_zproto::serializer &S = test_zproto::serializer::instance();
 	pk.phone[1].home = 0x3389;
 	pk.phone[1].work = 0x4498;
-	pk.phone[2].home = 0x3399;
-	pk.phone[2].work = 0x5599;
 	pk.address = "ShangHai";
 	pk.luck.push_back(3);
 	pk.luck.push_back(7);
 	pk.luck.push_back(5);
-	int sz = S->encode(pk, dat);
-	printf("encode size:%d\n", sz);
-	for (int i = 0; i < sz; i++)
-		printf("%x ", (uint8_t)dat[i]);
-	printf("\n");
-
+	int sz = S.encode(pk, dat);
+	printf("encode1 size:%d\n", sz);
+	print_hex((uint8_t *)dat.c_str(), dat.size());
+	datsize = S.encode(pk, &datbuf);
+	printf("encode2 size:%d\n", sz);
+	print_hex(datbuf, datsize);
 	sz = test_zproto::serializer::instance().decode(pk2, dat);
-	printf("decode size:%d\n", sz);
-	for (auto &iter:pk2.phone) {
-		printf("packet::phone[%x]::home:0x%x\n", iter.first, iter.second.home);
-		printf("packet::phone[%x]::work:0x%x\n", iter.first, iter.second.work);
-	}
-	printf("packet::address:%s\n", pk2.address.c_str());
-	printf("packet::luck size:%lu\n", pk2.luck.size());
-	for (size_t i = 0; i < pk2.luck.size(); i++)
-		printf("%d ", pk2.luck[i]);
-	printf("\r\n");
-	delete S;
+	printf("decode1 size:%d\n", sz);
+	print_struct(pk2);
+	sz = test_zproto::serializer::instance().decode(pk3, datbuf, datsize);
+	printf("decode2 size:%d\n", sz);
+	print_struct(pk3);
 	return 0;
 }
 

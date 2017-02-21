@@ -29,10 +29,12 @@ public:
 	wiretree(const char *proto);
 	~wiretree();
 	int encode(const wire &w, std::string &dat);
+	int encode(const wire &w, const uint8_t **data);
 	int decode(wire &w, const std::string &dat);
 	int decode(wire &w, const uint8_t *dat, size_t datasz);
 private:
 	void expand();
+	int encodecheck(const wire &w);
 	struct zproto_struct *query(const char *name);
 private:
 	const char *protodef;
