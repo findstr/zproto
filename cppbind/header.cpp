@@ -175,8 +175,8 @@ wiretree(FILE *fp)
 {
 	fprintf(fp, "%s",
 "class serializer:public wiretree {\n"
-"public:\n"
 "	 serializer();\n"
+"public:\n"
 "	 static serializer &instance();\n"
 "};\n");
 }
