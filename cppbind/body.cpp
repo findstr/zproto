@@ -21,7 +21,7 @@ fill_normal(struct zproto_args *args, const char *type)
 	char buff[512];
 	const char *fmt =
 "	 case %d:\n"
-"		 if (args->buffsz < sizeof(%s))\n"
+"		 if (args->buffsz < (int)sizeof(%s))\n"
 "			 return ZPROTO_OOM;\n"
 "		 (*(%s *)args->buff) = %s;\n"
 "		 return sizeof(%s);\n";
@@ -33,7 +33,7 @@ fill_normal(struct zproto_args *args, const char *type)
 "			 args->len = args->idx;\n"
 "			 return ZPROTO_NOFIELD;\n"
 "		 }\n"
-"		 if (args->buffsz < sizeof(%s))\n"
+"		 if (args->buffsz < (int)sizeof(%s))\n"
 "			 return ZPROTO_OOM;\n"
 "		 (*(%s *)args->buff) = %s[args->idx];\n"
 "		 return sizeof(%s);\n";
@@ -75,7 +75,7 @@ fill_string(struct zproto_args *args)
 	char buff[512];
 	const char *fmt =
 "	 case %d:\n"
-"		 if (args->buffsz < %s.size())\n"
+"		 if (args->buffsz < (int)%s.size())\n"
 "			 return ZPROTO_OOM;\n"
 "		 memcpy(args->buff, %s.c_str(), %s.size());\n"
 "		 return %s.size();\n";

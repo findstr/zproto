@@ -8,11 +8,11 @@ PLATS=linux macosx
 platform:
 	@echo "'make PLATFORM' where PLATFORM is one of these:"
 	@echo "$(PLATS)"
-CCFLAG = -I../ -Ilua53/ -g -Wall
+CCFLAG = -I../ -Ilua53/ -g -Wall -Wextra
 LDFLAG := -lm -ldl
 
 linux:LDFLAG += -Wl,-E -lrt
-macosx:LDFLAG += -Wl,-no_compact_unwind 
+macosx:LDFLAG += -Wl,-no_compact_unwind
 linux macosx:LDFLAG += -lpthread
 
 linux:SHARED:=--share -fPIC
