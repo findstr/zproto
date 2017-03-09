@@ -1,5 +1,5 @@
 CC=g++
-CCFLAG=-Wall -g -std=c++0x -I../
+CCFLAG=-Wall -Wextra -g -std=c++0x -I../
 
 zproto:zproto.o header.cpp body.cpp
 	$(CC) $(CCFLAG) -o zproto proto.cpp header.cpp body.cpp zproto.o
