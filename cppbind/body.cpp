@@ -81,19 +81,20 @@ fill_string(struct zproto_args *args)
 "		 return %s.size();\n";
 
 	const char *afmt =
-"	 case %d:\n"
+"	 case %d:{\n"
 "		 assert(args->idx >= 0);\n"
 "		 if (args->idx >= (int)%s.size()) {\n"
 "			 args->len = args->idx;\n"
 "			 return ZPROTO_NOFIELD;\n"
 "		 }\n"
-"		 if (args->buffsz < %s.size())\n"
+"		 auto &obj = %s[args->idx];\n"
+"		 if (args->buffsz < (int)obj.size())\n"
 "			 return ZPROTO_OOM;\n"
-"		 memcpy(args->buff, (uint8_t *)%s.c_str(), %s.size());"
-"		 return %s.size();\n";
+"		 memcpy(args->buff, (uint8_t *)obj.c_str(), obj.size());\n"
+"		 return obj.size();}\n";
 
 	if (args->idx >= 0)
-		snprintf(buff, 512, afmt, args->tag, args->name, args->name, args->name, args->name, args->name);
+		snprintf(buff, 512, afmt, args->tag, args->name, args->name);
 	else
 		snprintf(buff, 512, fmt, args->tag, args->name, args->name, args->name, args->name);
 	return buff;
@@ -108,12 +109,13 @@ to_string(struct zproto_args *args)
 "		 %s.assign((char *)args->buff, args->buffsz);\n"
 "		 return args->buffsz;\n";
 	const char *afmt =
-"	 cast %d:\n"
+"	 case %d:\n"
 "		 assert(args->idx >= 0);\n"
 "		 if (args->len == 0)\n"
 "			 return 0;\n"
 "		 %s.resize(args->idx + 1);\n"
-"		 %s[args.idx].assign(char *)args->buff, args->buffsz);\n";
+"		 %s[args->idx].assign((char *)args->buff, args->buffsz);\n"
+"		 return args->buffsz;\n";
 	if (args->idx >= 0)
 		snprintf(buff, 512, afmt, args->tag, args->name, args->name);
 	else

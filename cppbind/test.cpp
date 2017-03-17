@@ -25,6 +25,9 @@ print_struct(const test_zproto::packet &pk)
 	for (size_t i = 0; i < pk.luck.size(); i++)
 		printf("%d ", pk.luck[i]);
 	printf("\n");
+	for (const auto &iter:pk.address1)
+		printf("packet::address1 %s\n", iter.c_str());
+	printf("\n");
 }
 
 int main()
@@ -42,6 +45,8 @@ int main()
 	pk.luck.push_back(3);
 	pk.luck.push_back(7);
 	pk.luck.push_back(5);
+	pk.address1.push_back("hello");
+	pk.address1.push_back("world");
 	int sz = S.encode(pk, dat);
 	printf("encode1 size:%d\n", sz);
 	print_hex((uint8_t *)dat.c_str(), dat.size());
