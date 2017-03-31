@@ -38,7 +38,6 @@ int main()
 	test_zproto::packet pk;
 	test_zproto::packet pk2;
 	test_zproto::packet pk3;
-	test_zproto::serializer &S = test_zproto::serializer::instance();
 	pk.phone[1].home = 0x3389;
 	pk.phone[1].work = 0x4498;
 	pk.address = "ShangHai";
@@ -47,16 +46,16 @@ int main()
 	pk.luck.push_back(5);
 	pk.address1.push_back("hello");
 	pk.address1.push_back("world");
-	int sz = S.encode(pk, dat);
+	int sz = pk._serialize(dat);
 	printf("encode1 size:%d\n", sz);
 	print_hex((uint8_t *)dat.c_str(), dat.size());
-	datsize = S.encode(pk, &datbuf);
+	datsize = pk._serialize(&datbuf);
 	printf("encode2 size:%d\n", sz);
 	print_hex(datbuf, datsize);
-	sz = test_zproto::serializer::instance().decode(pk2, dat);
+	sz = pk2._parse(dat);
 	printf("decode1 size:%d\n", sz);
 	print_struct(pk2);
-	sz = test_zproto::serializer::instance().decode(pk3, datbuf, datsize);
+	sz = pk3._parse(datbuf, datsize);
 	printf("decode2 size:%d\n", sz);
 	print_struct(pk3);
 	return 0;

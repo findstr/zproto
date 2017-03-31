@@ -363,6 +363,27 @@ wiretree(FILE *fp, const char *proto)
 "}\n");
 }
 
+static const char *wirep =
+"int\n"
+"wirep::_serialize(std::string &dat) const\n"
+"{\n"
+"	return serializer::instance().encode(*this, dat);\n"
+"}\n"
+"int\n"
+"wirep::_serialize(const uint8_t **data) const\n"
+"{\n"
+"	return serializer::instance().encode(*this, data);\n"
+"}\n"
+"int\n"
+"wirep::_parse(const std::string &dat)\n"
+"{\n"
+"	return serializer::instance().decode(*this, dat);\n"
+"}\n"
+"int\n"
+"wirep::_parse(const uint8_t *data, int datasz)\n"
+"{\n"
+"	return serializer::instance().decode(*this, data, datasz);\n"
+"}\n\n";
 void
 body(const char *name, const char *proto, struct zproto *z)
 {
@@ -382,6 +403,7 @@ body(const char *name, const char *proto, struct zproto *z)
 	fprintf(fp, "#include \"%s.hpp\"\n", name);
 	fprintf(fp, "namespace %s {\n\n", name);
 	fprintf(fp, "using namespace zprotobuf;\n\n");
+	fprintf(fp, wirep);
 	dumpst(fp, z, zproto_next(z, NULL));
 	wiretree(fp, proto);
 	fprintf(fp, "\n}\n");

@@ -46,6 +46,31 @@ wire::_decode_proxy(struct zproto_args *args)
 	return _decode_field(args);
 }
 
+int
+wire::_serialize(std::string &dat) const
+{
+	(void)dat;
+	return 0;
+}
+int
+wire::_serialize(const uint8_t **data) const
+{
+	(void)data;
+	return 0;
+}
+int
+wire::_parse(const std::string &dat)
+{
+	(void)dat;
+	return 0;
+}
+int
+wire::_parse(const uint8_t *data, int datasz)
+{
+	(void)data;
+	(void)datasz;
+	return 0;
+}
 //syntax tree
 
 wiretree::wiretree(const char *proto)

@@ -52,12 +52,20 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
 		newargs.type.end()
 	);
 	//open
+	const char *herit;
+	if (protocol.count(st))
+		herit = ":public wirep ";
+	else
+		herit = ":public wire ";
 	newargs.fields.insert(
 		newargs.fields.begin(),
-		t2 + "struct " + zproto_name(st) + ":public wire " + "{\n"
-		);
+                t2 + "struct " + zproto_name(st) + herit + "{\n");
 	//member function
-	snprintf(buff, 2048, funcproto, t2.c_str(), t1.c_str(), t1.c_str(), t2.c_str(), t1.c_str());
+        snprintf(buff, 2048, funcproto,
+			t2.c_str(),
+			t1.c_str(), t1.c_str(),
+			t2.c_str(),
+			t1.c_str());
 	newargs.fields.push_back(buff);
 
 	//close
@@ -180,6 +188,14 @@ wiretree(FILE *fp)
 "	 static serializer &instance();\n"
 "};\n");
 }
+const char *wirep =
+"struct wirep:public wire {\n"
+"public:\n"
+"        virtual int _serialize(std::string &dat) const;\n"
+"        virtual int _serialize(const uint8_t **data) const;\n"
+"        virtual int _parse(const std::string &dat);\n"
+"        virtual int _parse(const uint8_t *data, int datasz);\n"
+"};\n\n";
 
 void
 header(const char *name, struct zproto *z)
@@ -200,6 +216,7 @@ header(const char *name, struct zproto *z)
 	fprintf(fp, "#include \"zprotowire.h\"\n");
 	fprintf(fp, "namespace %s {\n\n", name);
 	fprintf(fp, "using namespace zprotobuf;\n\n");
+	fprintf(fp, wirep);
 	dumpst(fp, z, st);
 	wiretree(fp);
 	fprintf(fp, "\n}\n");

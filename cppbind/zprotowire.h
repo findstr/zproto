@@ -16,6 +16,11 @@ public:
 	int _decode(uint8_t *buff, int buffsz, struct zproto_struct *st);
 	int _encode_proxy(struct zproto_args *args) const;
 	int _decode_proxy(struct zproto_args *args);
+public:
+        virtual int _serialize(std::string &dat) const;
+        virtual int _serialize(const uint8_t **data) const;
+        virtual int _parse(const std::string &dat);
+        virtual int _parse(const uint8_t *data, int datasz);
 protected:
 	virtual int _encode_field(struct zproto_args *args) const = 0;
 	virtual int _decode_field(struct zproto_args *args) = 0;
