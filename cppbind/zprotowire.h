@@ -22,6 +22,14 @@ public:
         virtual int _parse(const std::string &dat);
         virtual int _parse(const uint8_t *data, int datasz);
 protected:
+	int _write(struct zproto_args *args, uint8_t val) const;
+	int _write(struct zproto_args *args, uint32_t val) const;
+	int _write(struct zproto_args *args, const std::string &val) const;
+
+	int _read(struct zproto_args *args, uint8_t &val);
+	int _read(struct zproto_args *args, uint32_t &val);
+	int _read(struct zproto_args *args, std::string &val);
+protected:
 	virtual int _encode_field(struct zproto_args *args) const = 0;
 	virtual int _decode_field(struct zproto_args *args) = 0;
 	mutable std::unordered_map<int, const void *> maptoarray;

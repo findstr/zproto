@@ -183,9 +183,9 @@ wiretree(FILE *fp)
 {
 	fprintf(fp, "%s",
 "class serializer:public wiretree {\n"
-"	 serializer();\n"
+"\tserializer();\n"
 "public:\n"
-"	 static serializer &instance();\n"
+"\tstatic serializer &instance();\n"
 "};\n");
 }
 const char *wirep =

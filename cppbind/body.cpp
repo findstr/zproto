@@ -16,106 +16,22 @@ struct stmt_args {
 };
 
 static std::string inline
-fill_normal(struct zproto_args *args, const char *type)
+fill_normal(struct zproto_args *args)
 {
 	char buff[512];
 	const char *fmt =
-"	 case %d:\n"
-"		 if (args->buffsz < (int)sizeof(%s))\n"
-"			 return ZPROTO_OOM;\n"
-"		 (*(%s *)args->buff) = %s;\n"
-"		 return sizeof(%s);\n";
+	"\tcase %d:\n"
+	"\t\treturn _write(args, %s);\n";
 
 	const char *afmt =
-"	 case %d:\n"
-"		 assert(args->idx >= 0);\n"
-"		 if (args->idx >= (int)%s.size()) {\n"
-"			 args->len = args->idx;\n"
-"			 return ZPROTO_NOFIELD;\n"
-"		 }\n"
-"		 if (args->buffsz < (int)sizeof(%s))\n"
-"			 return ZPROTO_OOM;\n"
-"		 (*(%s *)args->buff) = %s[args->idx];\n"
-"		 return sizeof(%s);\n";
+	"\tcase %d:\n"
+	"\t\tassert(args->idx >= 0);\n"
+	"\t\tif (args->idx >= (int)%s.size()) {\n"
+	"\t\t\targs->len = args->idx;\n"
+	"\t\t\treturn ZPROTO_NOFIELD;\n"
+	"\t\t}\n"
+	"\t\treturn _write(args, %s[args->idx]);\n";
 
-	if (args->idx >= 0)
-		snprintf(buff, 512, afmt, args->tag, args->name, type, type, args->name, type);
-	else
-		snprintf(buff, 512, fmt, args->tag, type, type, args->name, type);
-	return buff;
-}
-
-static std::string inline
-to_normal(struct zproto_args *args, const char *type)
-{
-	char buff[512];
-	const char *fmt =
-"	 case %d:\n"
-"		 %s = (*(%s *)args->buff);\n"
-"		 return sizeof(%s);\n";
-	const char *afmt =
-"	 case %d:\n"
-"		  assert(args->idx >= 0);\n"
-"		  if (args->len == 0)\n"
-"			  return 0;\n"
-"		  %s.resize(args->idx + 1);\n"
-"		  %s[args->idx] = (*(%s *)args->buff);\n"
-"		  return sizeof(%s);\n";
-
-	if (args->idx >= 0)
-		snprintf(buff, 512, afmt, args->tag, args->name, args->name, type, type);
-	else
-		snprintf(buff, 512, fmt, args->tag, args->name, type, type);
-	return buff;
-}
-
-static std::string inline
-fill_string(struct zproto_args *args)
-{
-	char buff[512];
-	const char *fmt =
-"	 case %d:\n"
-"		 if (args->buffsz < (int)%s.size())\n"
-"			 return ZPROTO_OOM;\n"
-"		 memcpy(args->buff, %s.c_str(), %s.size());\n"
-"		 return %s.size();\n";
-
-	const char *afmt =
-"	 case %d:{\n"
-"		 assert(args->idx >= 0);\n"
-"		 if (args->idx >= (int)%s.size()) {\n"
-"			 args->len = args->idx;\n"
-"			 return ZPROTO_NOFIELD;\n"
-"		 }\n"
-"		 auto &obj = %s[args->idx];\n"
-"		 if (args->buffsz < (int)obj.size())\n"
-"			 return ZPROTO_OOM;\n"
-"		 memcpy(args->buff, (uint8_t *)obj.c_str(), obj.size());\n"
-"		 return obj.size();}\n";
-
-	if (args->idx >= 0)
-		snprintf(buff, 512, afmt, args->tag, args->name, args->name);
-	else
-		snprintf(buff, 512, fmt, args->tag, args->name, args->name, args->name, args->name);
-	return buff;
-}
-
-static std::string inline
-to_string(struct zproto_args *args)
-{
-	char buff[512];
-	const char *fmt =
-"	 case %d:\n"
-"		 %s.assign((char *)args->buff, args->buffsz);\n"
-"		 return args->buffsz;\n";
-	const char *afmt =
-"	 case %d:\n"
-"		 assert(args->idx >= 0);\n"
-"		 if (args->len == 0)\n"
-"			 return 0;\n"
-"		 %s.resize(args->idx + 1);\n"
-"		 %s[args->idx].assign((char *)args->buff, args->buffsz);\n"
-"		 return args->buffsz;\n";
 	if (args->idx >= 0)
 		snprintf(buff, 512, afmt, args->tag, args->name, args->name);
 	else
@@ -123,6 +39,28 @@ to_string(struct zproto_args *args)
 	return buff;
 }
 
+static std::string inline
+to_normal(struct zproto_args *args)
+{
+	char buff[512];
+	const char *fmt =
+	"\tcase %d:\n"
+	"\t\treturn _read(args, %s);\n";
+
+	const char *afmt =
+	"\tcase %d:\n"
+	"\t\tassert(args->idx >= 0);\n"
+	"\t\tif (args->len == 0)\n"
+	"\t\t\treturn 0;\n"
+	"\t\t%s.resize(args->idx + 1);\n"
+	"\t\treturn _read(args, %s[args->idx]);\n";
+
+	if (args->idx >= 0)
+		snprintf(buff, 512, afmt, args->tag, args->name, args->name);
+	else
+		snprintf(buff, 512, fmt, args->tag, args->name);
+	return buff;
+}
 
 static std::string inline
 fill_struct(struct zproto_args *args)
@@ -211,7 +149,7 @@ format_code(const char *base, const char *name, const char *qualifier)
 	"int\n"
 	"%s::%s(struct zproto_args *args) %s\n"
 	"{\n"
-	"	switch (args->tag) {\n";
+	"\tswitch (args->tag) {\n";
 
 	char buff[1024];
 	snprintf(buff, 1024, fmt, base, name, qualifier);
@@ -222,9 +160,9 @@ static std::string inline
 format_close()
 {
 	static const char *fmt =
-	"	 default:\n"
-	"		 return ZPROTO_ERROR;\n"
-	"	 }\n"
+	"\tdefault:\n"
+	"\t\treturn ZPROTO_ERROR;\n"
+	"\t}\n"
 	"}\n";
 	return fmt;
 }
@@ -236,7 +174,7 @@ format_name(const char *base)
 	"const char *\n"
 	"%s::_name() const\n"
 	"{\n"
-	"	return \"%s\";\n"
+	"\treturn \"%s\";\n"
 	"}\n";
 
 	char buff[1024];
@@ -298,16 +236,10 @@ prototype_cb(struct zproto_args *args)
 		dstm = to_struct(args);
 		break;
 	case ZPROTO_STRING:
-		estm = fill_string(args);
-		dstm = to_string(args);
-		break;
 	case ZPROTO_BOOLEAN:
-		estm = fill_normal(args, "uint8_t");
-		dstm = to_normal(args, "uint8_t");
-		break;
 	case ZPROTO_INTEGER:
-		estm = fill_normal(args, "uint32_t");
-		dstm = to_normal(args, "uint32_t");
+		estm = fill_normal(args);
+		dstm = to_normal(args);
 		break;
 	default:
 		break;

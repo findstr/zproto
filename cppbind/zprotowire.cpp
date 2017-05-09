@@ -22,6 +22,64 @@ decode_cb(struct zproto_args *arg)
 	return w->_decode_proxy(arg);
 }
 
+template<typename T> int
+write(struct zproto_args *args, T val)
+{
+	if (args->buffsz < sizeof(T))
+		return ZPROTO_OOM;
+	(*(T *)args->buff) = val;
+	return sizeof(T);
+}
+
+template<typename T> int
+read(struct zproto_args *args, T &val)
+{
+	if (args->buffsz < sizeof(T))
+		return ZPROTO_ERROR;
+	val = (*(T *)args->buff);
+	return sizeof(T);
+}
+
+int
+wire::_write(struct zproto_args *args, uint8_t val) const
+{
+	return write(args, val);
+}
+
+int
+wire::_write(struct zproto_args *args, uint32_t val) const
+{
+	return write(args, val);
+}
+
+int
+wire::_write(struct zproto_args *args, const std::string &val) const
+{
+	if (args->buffsz < val.size())
+		return ZPROTO_OOM;
+	memcpy(args->buff, val.c_str(), val.size());
+	return val.size();
+}
+
+int
+wire::_read(struct zproto_args *args, uint8_t &val)
+{
+	return read(args, val);
+}
+
+int
+wire::_read(struct zproto_args *args, uint32_t &val)
+{
+	return read(args, val);
+}
+
+int
+wire::_read(struct zproto_args *args, std::string &val)
+{
+	val.assign((char *)args->buff, args->buffsz);
+	return args->buffsz;
+}
+
 int
 wire::_encode(uint8_t *buff, int buffsz, struct zproto_struct *st) const
 {
