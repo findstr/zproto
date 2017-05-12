@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -93,6 +93,8 @@ namespace zprotobuf
 		public abstract string _name();
 		protected abstract int _encode_field(ref dll.args arg);
 		protected abstract int _decode_field(ref dll.args arg);
+		public abstract int _serialize(out byte[] dat);
+		public abstract int _parse(byte[] dat);
 	}
 
 	public class wiretree {

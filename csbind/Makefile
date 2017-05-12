@@ -2,7 +2,7 @@
 
 all:zproto zproto.dll
 
-zproto:proto.cpp body.cpp body.h zproto.o
+zproto:proto.cpp body.cpp zproto.o
 	g++ -g -std=c++0x -I../ -o $@ $^
 
 zproto.o:../zproto.c
