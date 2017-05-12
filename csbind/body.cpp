@@ -146,6 +146,7 @@ to_struct(struct zproto_args *args, const char *type, int level)
 
 	const char *fmt =
 	"%s\tcase %d:\n"
+	"%s\t\t%s = new %s();\n"
 	"%s\t\treturn %s._decode(args.buff, args.buffsz, args.sttype);\n";
 
 	std::string t = tab(level);
@@ -165,6 +166,7 @@ to_struct(struct zproto_args *args, const char *type, int level)
 	} else {
 		snprintf(buff, 512, fmt,
 				t.c_str(), args->tag,
+				t.c_str(), args->name, type,
 				t.c_str(), args->name);
 	}
 	return buff;
@@ -296,7 +298,7 @@ prototype_cb(struct zproto_args *args)
 		dstm = to_struct(args, subtype.c_str(), ud->level);
 		break;
 	case ZPROTO_STRING:
-		subtype = "string";
+		subtype = "byte[]";
 		goto gen;
 		break;
 	case ZPROTO_BOOLEAN:
@@ -375,8 +377,11 @@ static const char *wirep =
 "\tpublic override int _serialize(out byte[] dat) {\n"
 "\t\treturn serializer.instance().encode(this, out dat);\n"
 "\t}\n"
-"\tpublic override int _parse(byte[] dat) {\n"
-"\t\treturn serializer.instance().decode(this, dat);\n"
+"\tpublic override int _parse(byte[] dat, int size) {\n"
+"\t\treturn serializer.instance().decode(this, dat, size);\n"
+"\t}\n"
+"\tpublic override int _tag() {\n"
+"\t\treturn serializer.instance().tag(_name());\n"
 "\t}\n"
 "}\n\n";
 

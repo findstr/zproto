@@ -35,7 +35,7 @@ a simple protocol buffer for lua
 		#protocol is option, it's aka typename when it's explicitly specified
 		#protocol value can be queryed by zproto:querytag@zproto.lua
 		#protocol value will be 0, when it not be explicitly specified
-                typename [protocol] {
+		typename [protocol] {
 			.field1:integer 1
 			...
 		}

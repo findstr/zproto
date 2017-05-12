@@ -7,7 +7,7 @@ namespace zprotobuf
 {
 	public class dll
 	{
-		private const string DLLNAME = "zproto.dll";
+		private const string DLLNAME = "zproto";
 		public const int OOM = -1;
 		public const int NOFIELD = -2;
 		public const int ERROR = -3;
@@ -53,7 +53,10 @@ namespace zprotobuf
 		[DllImport(DLLNAME, EntryPoint = "csquery", CallingConvention = CallingConvention.Cdecl)]
 		public extern static System.IntPtr query(System.IntPtr z, string name);
 
-		[DllImport(DLLNAME, EntryPoint = "csquery", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cstag", CallingConvention = CallingConvention.Cdecl)]
+		public extern static int tag(System.IntPtr st);
+
+		[DllImport(DLLNAME, EntryPoint = "csquerytag", CallingConvention = CallingConvention.Cdecl)]
 		public extern static System.IntPtr querytag(System.IntPtr z, int tag);
 
 		[DllImport(DLLNAME, EntryPoint = "csencode", CallingConvention = CallingConvention.Cdecl)]

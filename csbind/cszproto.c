@@ -3,7 +3,11 @@
 #include <string.h>
 #include "zproto.h"
 
+#ifdef	WIN32
 #define	EXPORT __declspec(dllexport)
+#else
+#define	EXPORT
+#endif
 
 struct zproto * EXPORT
 csload(const char *file)
@@ -44,6 +48,12 @@ struct zproto_struct * EXPORT
 csquery(struct zproto *z, const char *name)
 {
 	return zproto_query(z, name);
+}
+
+int EXPORT
+cstag(struct zproto_struct *st)
+{
+	return zproto_tag(st);
 }
 
 struct zproto_struct * EXPORT

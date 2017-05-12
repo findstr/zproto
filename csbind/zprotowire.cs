@@ -28,7 +28,7 @@ namespace zprotobuf
 			uds[id] = null;
 		}
 
-		private int write(ref dll.args arg, byte[] src) {
+		protected int write(ref dll.args arg, byte[] src) {
 			if (src.Length > arg.buffsz)
 				return dll.OOM;
 			Marshal.Copy(src, 0, arg.buff, src.Length);
@@ -42,11 +42,6 @@ namespace zprotobuf
 
 		protected int write(ref dll.args arg, int val) {
 			byte[] src = BitConverter.GetBytes(val);
-			return write(ref arg, src);
-		}
-
-		protected int write(ref dll.args arg, string val) {
-			byte[] src = Encoding.ASCII.GetBytes(val);
 			return write(ref arg, src);
 		}
 
@@ -69,9 +64,8 @@ namespace zprotobuf
 			val = BitConverter.ToInt32(read(ref arg), 0);
 			return arg.buffsz;
 		}
-		protected int read(ref dll.args arg, out string val) {
-			val = "";
-			val = Encoding.Default.GetString(read(ref arg));
+		protected int read(ref dll.args arg, out byte[] val) {
+			val = read(ref arg);
 			return arg.buffsz;
 		}
 
@@ -94,7 +88,9 @@ namespace zprotobuf
 		protected abstract int _encode_field(ref dll.args arg);
 		protected abstract int _decode_field(ref dll.args arg);
 		public abstract int _serialize(out byte[] dat);
-		public abstract int _parse(byte[] dat);
+<<<<<<< HEAD
+		public abstract int _parse(byte[] dat, int size);
+		public abstract int _tag();
 	}
 
 	public class wiretree {
@@ -119,6 +115,11 @@ namespace zprotobuf
 			IntPtr st = dll.query(Z, name);
 			cache[name] = st;
 			return st;
+		}
+
+		public int tag(string name) {
+			IntPtr st = query(name);
+			return dll.tag(st);
 		}
 
 		private void expand() {
@@ -152,15 +153,15 @@ namespace zprotobuf
 			}
 			return sz;
 		}
-		public int decode(wire obj, byte[] data) {
+		public int decode(wire obj, byte[] data, int size) {
 			int len = bufflen;
 			IntPtr st = query(obj._name());
-			while (bufflen < data.Length)
+			while (bufflen < size)
 				bufflen *= 2;
 			if (bufflen != len)
 				buff = Marshal.ReAllocHGlobal(buff, (IntPtr)bufflen);
-			Marshal.Copy(data, 0, buff, data.Length);
-			return obj._decode(buff, data.Length, st);
+			Marshal.Copy(data, 0, buff, size);
+			return obj._decode(buff, size, st);
 		}
 	}
 }
