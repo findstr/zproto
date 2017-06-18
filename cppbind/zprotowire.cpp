@@ -108,12 +108,14 @@ int
 wire::_serialize(std::string &dat) const
 {
 	(void)dat;
+	assert(!"not implement");
 	return 0;
 }
 int
 wire::_serialize(const uint8_t **data) const
 {
 	(void)data;
+	assert(!"not implement");
 	return 0;
 }
 int
