@@ -162,6 +162,7 @@ encode_array(struct zproto_args *args)
 			lua_pop(L, 1);
 			return ZPROTO_NOFIELD;
 		}
+		luaL_checktype(L, -1, LUA_TTABLE);
 		lua_pushnil(L);
 	}
 	n = lua_next(L, -2);
