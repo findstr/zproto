@@ -70,10 +70,10 @@ to_normal(struct zproto_args *args, const char *type, int level)
 
 	const char *afmt =
 	"%s\tcase %d:\n"
-	"%s\t\tif (args.len == 0)\n"
-	"%s\t\t\treturn 0;\n"
 	"%s\t\tif (args.idx == 0)\n"
 	"%s\t\t\t%s = new %s[args.len];\n"
+	"%s\t\tif (args.len == 0)\n"
+	"%s\t\t\treturn 0;\n"
 	"%s\t\treturn read(ref args, out %s[args.idx]);\n";
 
 	std::string t = tab(level);
@@ -81,9 +81,9 @@ to_normal(struct zproto_args *args, const char *type, int level)
 		snprintf(buff, 512, afmt,
 			t.c_str(), args->tag,
 			t.c_str(),
-			t.c_str(),
-			t.c_str(),
 			t.c_str(), args->name, type,
+			t.c_str(),
+			t.c_str(),
 			t.c_str(), args->name);
 	} else {
 		snprintf(buff, 512, fmt,
@@ -137,10 +137,10 @@ to_struct(struct zproto_args *args, const char *type, int level)
 	const char *afmt =
 	"%s\tcase %d:\n"
 	"%s\t\tDebug.Assert(args.idx >= 0);\n"
-	"%s\t\tif (args.len == 0)\n"
-	"%s\t\t\treturn 0;\n"
 	"%s\t\tif (args.idx == 0)\n"
 	"%s\t\t\t%s = new %s[args.len];\n"
+	"%s\t\tif (args.len == 0)\n"
+	"%s\t\t\treturn 0;\n"
 	"%s\t\t%s[args.idx] = new %s();\n"
 	"%s\t\treturn %s[args.idx]._decode(args.buff, args.buffsz, args.sttype);\n";
 
@@ -158,9 +158,9 @@ to_struct(struct zproto_args *args, const char *type, int level)
 				t.c_str(), args->tag,
 				t.c_str(),
 				t.c_str(),
-				t.c_str(),
-				t.c_str(),
 				t.c_str(), args->name, type,
+				t.c_str(),
+				t.c_str(),
 				t.c_str(), args->name, type,
 				t.c_str(), args->name);
 	} else {

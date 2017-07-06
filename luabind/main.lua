@@ -2,7 +2,7 @@ local zproto = require "zproto"
 local rand = require "rand"
 
 local protostr1 = [[
-info {
+info 0xfd {
 	.name:string 1
 	.age:integer 6
 	.girl:boolean 9
@@ -28,7 +28,7 @@ packet 0xfe {
 ]]
 
 local protostr2 = [[
-info {
+info 0xfd {
 	.name:string 1
 	.age:integer 6
 	.girl:boolean 9
@@ -54,7 +54,6 @@ packet 0xfe {
 	.new:info[name] 57
 }
 ]]
-
 
 local proto = zproto:parse (protostr1)
 local newproto = zproto:parse(protostr2)
@@ -143,6 +142,15 @@ local function testwire()
 	print("=========stop test wire=============")
 end
 
+local function testarrayfault()
+	packet.empty = false
+	print("========begin test array fault===========")
+	local ok, err = pcall(newproto.encode, newproto, 0xfe, packet)
+	print("testarray fault:", ok, err)
+	print("========stop test array fault===========")
+	packet.empty = {}
+end
+
 local function testcompatible(name, e, d)
 	print(string.format("=========begin test compatible %s =============", name))
 	print("+++++++source table")
@@ -223,8 +231,9 @@ end
 --test decode defend
 --test unpack defend
 
---testproto()
+testproto()
 testwire()
+testarrayfault()
 testcompatible("old", proto, newproto)
 testcompatible("new", newproto, proto)
 testpackunpack()
