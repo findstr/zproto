@@ -4,7 +4,7 @@ local rand = require "rand"
 local protostr1 = [[
 info 0xfd {
 	.name:string 1
-	.age:integer 6
+	.age:float 6
 	.girl:boolean 9
 	.boy:boolean 10
 }
@@ -30,7 +30,7 @@ packet 0xfe {
 local protostr2 = [[
 info 0xfd {
 	.name:string 1
-	.age:integer 6
+	.age:float 6
 	.girl:boolean 9
 	.boy:boolean 10
 	.new:string[] 12
@@ -64,8 +64,8 @@ assert(newproto)
 local packet = {
 	phone = {home=0x123456, work=0x654321},
 	info = {
-			{name = "lucy", age = 18, girl = false, boy = true},
-			{name="lilei", age = 24, girl = true, boy = false},
+			{name = "lucy", age = 18.3, girl = false, boy = true},
+			{name="lilei", age = 24.5, girl = true, boy = false},
 		},
 	address = "China.shanghai",
 	luck = {1, 3, 9},

@@ -53,9 +53,15 @@ wire::_write(struct zproto_args *args, uint32_t val) const
 }
 
 int
+wire::_write(struct zproto_args *args, float val) const
+{
+	return write(args, val);
+}
+
+int
 wire::_write(struct zproto_args *args, const std::string &val) const
 {
-	if (args->buffsz < val.size())
+	if (args->buffsz < (int)val.size())
 		return ZPROTO_OOM;
 	memcpy(args->buff, val.c_str(), val.size());
 	return val.size();
@@ -69,6 +75,12 @@ wire::_read(struct zproto_args *args, uint8_t &val)
 
 int
 wire::_read(struct zproto_args *args, uint32_t &val)
+{
+	return read(args, val);
+}
+
+int
+wire::_read(struct zproto_args *args, float &val)
 {
 	return read(args, val);
 }

@@ -307,6 +307,10 @@ prototype_cb(struct zproto_args *args)
 		break;
 	case ZPROTO_INTEGER:
 		subtype = "int";
+		goto gen;
+		break;
+	case ZPROTO_FLOAT:
+		subtype = "float";
 	gen:
 		estm = fill_normal(args, ud->level);
 		dstm = to_normal(args, subtype.c_str(), ud->level);

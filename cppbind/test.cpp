@@ -17,8 +17,8 @@ static void
 print_struct(const test_zproto::packet &pk)
 {
 	for (auto &iter:pk.phone) {
-		printf("packet::phone[%x]::home:0x%x\n", iter.first, iter.second.home);
-		printf("packet::phone[%x]::work:0x%x\n", iter.first, iter.second.work);
+		printf("packet::phone[%f]::home:0x%x\n", iter.first, iter.second.home);
+		printf("packet::phone[%f]::work:%f\n", iter.first, iter.second.work);
 	}
 	printf("packet::address:%s\n", pk.address.c_str());
 	printf("packet::luck size:%lu\n", pk.luck.size());
@@ -39,7 +39,7 @@ int main()
 	test_zproto::packet pk2;
 	test_zproto::packet pk3;
 	pk.phone[1].home = 0x3389;
-	pk.phone[1].work = 0x4498;
+	pk.phone[1].work = 999.98;
 	pk.address = "ShangHai";
 	pk.luck.push_back(3);
 	pk.luck.push_back(7);

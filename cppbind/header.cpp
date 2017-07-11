@@ -92,10 +92,13 @@ find_field_type(struct zproto_args *args)
 			ud->type = "std::string";
 			break;
 		case ZPROTO_BOOLEAN:
-			ud->type = "uint32_t";
+			ud->type = "uint8_t";
 			break;
 		case ZPROTO_INTEGER:
 			ud->type = "uint32_t";
+			break;
+		case ZPROTO_FLOAT:
+			ud->type = "float";
 			break;
 		default:
 			assert(!"unsupport key type of std::map");
@@ -146,6 +149,9 @@ prototype_cb(struct zproto_args *args)
 		break;
 	case ZPROTO_INTEGER:
 		subtype = "uint32_t";
+		break;
+	case ZPROTO_FLOAT:
+		subtype = "float";
 		break;
 	default:
 		break;

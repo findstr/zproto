@@ -2,7 +2,7 @@ packet 0xfe {
 	#english comment
 	phone {
 		.home:integer 1
-		.work:integer 2
+		.work:float 2
 	}
 	#中文注释
 	.phone:phone[work] 1
