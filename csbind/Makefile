@@ -16,7 +16,7 @@ zproto.dll:cszproto.c ../zproto.c
 zproto.so:cszproto.c ../zproto.c
 	gcc -m32 -g -I../  -Wl,-undefined,dynamic_lookup -o $@ $^
 
-test:zprotowire.cs zprotodll.cs test_zproto.cs main.cs
+test:zprotowire.cs zprotodll.cs hello_world.cs main.cs
 	csc /out:$@ $^
 
 clean:
@@ -26,4 +26,4 @@ clean:
 	-rm *.o
 	-rm *.so
 	-rm zproto.dll
-	-rm test_zproto.cs
+	-rm hello_world.cs

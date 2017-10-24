@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
-#include "test_zproto.hpp"
+#include "hello_world.hpp"
 
 static void
 print_hex(const uint8_t *buf, size_t sz)
@@ -14,7 +14,7 @@ print_hex(const uint8_t *buf, size_t sz)
 }
 
 static void
-print_struct(const test_zproto::packet &pk)
+print_struct(const hello::world::packet &pk)
 {
 	for (auto &iter:pk.phone) {
 		printf("packet::phone[%f]::home:0x%x\n", iter.first, iter.second.home);
@@ -35,9 +35,9 @@ int main()
 	std::string dat;
 	const uint8_t *datbuf;
 	int datsize;
-	test_zproto::packet pk;
-	test_zproto::packet pk2;
-	test_zproto::packet pk3;
+	hello::world::packet pk;
+	hello::world::packet pk2;
+	hello::world::packet pk3;
 	pk.phone[1].home = 0x3389;
 	pk.phone[1].work = 999.98;
 	pk.address = "ShangHai";

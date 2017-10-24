@@ -5,7 +5,7 @@ zproto:zproto.o header.cpp body.cpp
 	$(CC) $(CCFLAG) -o zproto proto.cpp header.cpp body.cpp zproto.o
 
 test:zproto.o zprotowire.o
-	$(CC) $(CCFLAG) -o test test.cpp test_zproto.cc zprotowire.o zproto.o
+	$(CC) $(CCFLAG) -o test test.cpp hello_world.cc zprotowire.o zproto.o
 
 libs: zprotowire.o zproto.o
 	ar rcs libzproto.a $^

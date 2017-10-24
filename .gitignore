@@ -33,3 +33,7 @@
 zproto
 luabind/lua53
 luabind/test
+cppbind/test
+cppbind/*.hpp
+cppbind/*.cc
+csbind/hello_world.cs

@@ -11,24 +11,43 @@
 #include "header.h"
 #include "body.h"
 
-static std::string inline
-strip_path(const char *path)
+static inline void
+strip_ext(char *path)
 {
-	std::string str;
-	size_t n = strlen(path);
-	char buff[PATH_MAX];
-	char *fstart = &buff[PATH_MAX];
-	const char *rstart;
-	for (rstart= path + n; rstart >= path; rstart--) {
-		if (*rstart == '\\' || *rstart == '/') {
+	char *p = strstr(path, ".zproto");
+	if (p != NULL)
+		*p = 0;
+	return ;
+}
+
+static inline std::string
+remove_dot(char *path)
+{
+	char *p = path;
+	for (;;) {
+		p = strchr(path, '.');
+		if (p == NULL)
 			break;
-		}
-		if (*rstart != '.')
-			*(--fstart) = *rstart;
-		else
-			*(--fstart) = '_';
+		*p = '_';
+		p++;
 	}
-	return fstart;
+	return path;
+}
+
+static inline void
+name_space(char *path, std::vector<const char *> &space)
+{
+	char *p;
+	for (;;) {
+		p = strchr(path, '.');
+		space.push_back(path);
+		if (p != NULL)
+			*p = 0;
+		else
+			break;
+		path = p + 1;
+	}
+	return ;
 }
 
 int main(int argc, char *argv[])
@@ -36,6 +55,8 @@ int main(int argc, char *argv[])
 	int err;
 	FILE *fp;
 	char *proto;
+	char *space_buf;
+	std::vector<const char *>space;
 	std::string name;
 	struct zproto *z;
 	struct stat st;
@@ -69,9 +90,13 @@ int main(int argc, char *argv[])
 		zproto_free(z);
 		return -1;
 	}
-	name = strip_path(argv[1]);
-	header(name.c_str(), z);
-	body(name.c_str(), proto, z);
+	strip_ext(argv[1]);
+	space_buf = strdup(argv[1]);
+	name = remove_dot(argv[1]);
+	name_space(space_buf, space);
+	header(name.c_str(), space, z);
+	body(name.c_str(), space, proto, z);
+	free(space_buf);
 	delete []proto;
 	zproto_free(z);
 	return 0;

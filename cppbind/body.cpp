@@ -318,7 +318,7 @@ static const char *wirep =
 "	return serializer::instance().decode(*this, data, datasz);\n"
 "}\n\n";
 void
-body(const char *name, const char *proto, struct zproto *z)
+body(const char *name, std::vector<const char*> &space, const char *proto, struct zproto *z)
 {
 	FILE *fp;
 	std::string path = name;
@@ -334,12 +334,15 @@ body(const char *name, const char *proto, struct zproto *z)
 	fprintf(fp, "#include <string.h>\n");
 	fprintf(fp, "#include \"zprotowire.h\"\n");
 	fprintf(fp, "#include \"%s.hpp\"\n", name);
-	fprintf(fp, "namespace %s {\n\n", name);
-	fprintf(fp, "using namespace zprotobuf;\n\n");
+	for (const auto p:space)
+		fprintf(fp, "namespace %s {\n", p);
+	fprintf(fp, "\nusing namespace zprotobuf;\n\n");
 	fprintf(fp, wirep);
 	dumpst(fp, z, zproto_next(z, NULL));
 	wiretree(fp, proto);
-	fprintf(fp, "\n}\n");
+	for (size_t i = 0; i < space.size(); i++)
+		fprintf(fp, "}");
+	fprintf(fp, "\n");
 	fclose(fp);
 }
 

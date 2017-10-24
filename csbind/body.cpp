@@ -61,6 +61,39 @@ fill_normal(struct zproto_args *args, int level)
 }
 
 static std::string inline
+to_string(struct zproto_args *args, int level)
+{
+	char buff[512];
+	const char *fmt =
+	"%s\tcase %d:\n"
+	"%s\t\treturn read(ref args, out %s);\n";
+
+	const char *afmt =
+	"%s\tcase %d:\n"
+	"%s\t\tif (args.idx == 0)\n"
+	"%s\t\t\t%s = new byte[args.len][];\n"
+	"%s\t\tif (args.len == 0)\n"
+	"%s\t\t\treturn 0;\n"
+	"%s\t\treturn read(ref args, out %s[args.idx]);\n";
+
+	std::string t = tab(level);
+	if (args->idx >= 0) {
+		snprintf(buff, 512, afmt,
+			t.c_str(), args->tag,
+			t.c_str(),
+			t.c_str(), args->name,
+			t.c_str(),
+			t.c_str(),
+			t.c_str(), args->name);
+	} else {
+		snprintf(buff, 512, fmt,
+			t.c_str(), args->tag,
+			t.c_str(), args->name);
+	}
+	return buff;
+}
+
+static std::string inline
 to_normal(struct zproto_args *args, const char *type, int level)
 {
 	char buff[512];
@@ -299,7 +332,8 @@ prototype_cb(struct zproto_args *args)
 		break;
 	case ZPROTO_STRING:
 		subtype = "byte[]";
-		goto gen;
+		estm = fill_normal(args, ud->level);
+		dstm = to_string(args, ud->level);
 		break;
 	case ZPROTO_BOOLEAN:
 		subtype = "bool";
@@ -362,17 +396,18 @@ wiretree(FILE *fp, const char *proto)
 		hex += buff;
 	}
 	fprintf(fp,
-	"public class serializer:wiretree {\n\n"
-	"\tprivate static serializer inst = null;\n\n"
-	"\tprivate const string def = \"%s\";\n"
-	"\tprivate serializer():base(def) {\n\n"
-	"\t}\n\n"
-	"public static serializer instance() {\n\n"
-	"\tif (inst == null)\n"
-	"\t\tinst = new serializer();\n"
-	"\treturn inst;\n"
-	"}\n\n",
-	hex.c_str()
+		"public class serializer:wiretree {\n\n"
+		"\tprivate static serializer inst = null;\n\n"
+		"\tprivate const string def = \"%s\";\n"
+		"\tprivate serializer():base(def) {\n\n"
+		"\t}\n\n"
+		"\tpublic static serializer instance() {\n"
+		"\t\tif (inst == null)\n"
+		"\t\t\tinst = new serializer();\n"
+		"\t\treturn inst;\n"
+		"\t}\n"
+		"}\n\n",
+		hex.c_str()
 	);
 }
 
@@ -390,7 +425,7 @@ static const char *wirep =
 "}\n\n";
 
 void
-body(const char *name, const char *proto, struct zproto *z)
+body(const char *name, std::vector<const char *> &space, const char *proto, struct zproto *z)
 {
 	FILE *fp;
 	std::string path = name;
@@ -409,13 +444,16 @@ body(const char *name, const char *proto, struct zproto *z)
 		"using System.Collections.Generic;\n"
 		"using System.Runtime.InteropServices;\n"
 		"using System.Diagnostics;\n"
-		"using zprotobuf;\n"
-		"namespace %s {\n",
-		name);
+		"using zprotobuf;\n");
+	for (const auto p:space)
+		fprintf(fp, "namespace %s {\n", p);
+	fprintf(fp, "\n");
 	fprintf(fp, wirep);
 	dumpst(fp, z, zproto_next(z, NULL));
 	wiretree(fp, proto);
-	fprintf(fp, "\n}\n}\n");
+	for (size_t i = 0; i < space.size(); i++)
+		fprintf(fp, "}");
+	fprintf(fp, "\n");
 	fclose(fp);
 }
 

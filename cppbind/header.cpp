@@ -204,7 +204,7 @@ const char *wirep =
 "};\n\n";
 
 void
-header(const char *name, struct zproto *z)
+header(const char *name, std::vector<const char *> &space, struct zproto *z)
 {
 	FILE *fp;
 	std::string path = name;
@@ -220,13 +220,16 @@ header(const char *name, struct zproto *z)
 	fp = fopen(path.c_str(), "wb+");
 	fprintf(fp, "#ifndef __%s_h\n#define __%s_h\n", name, name);
 	fprintf(fp, "#include \"zprotowire.h\"\n");
-	fprintf(fp, "namespace %s {\n\n", name);
-	fprintf(fp, "using namespace zprotobuf;\n\n");
+	for (const auto p:space)
+		fprintf(fp, "namespace %s {\n", p);
+	fprintf(fp, "\nusing namespace zprotobuf;\n\n");
 	fprintf(fp, wirep);
 	dumpst(fp, z, st);
 	wiretree(fp);
-	fprintf(fp, "\n}\n");
-	fprintf(fp, "#endif\n");
+	fprintf(fp, "\n");
+	for (size_t i = 0; i < space.size(); i++)
+		fprintf(fp, "}");
+	fprintf(fp, "\n#endif\n");
 	fclose(fp);
 }
 
