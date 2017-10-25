@@ -82,11 +82,13 @@ fill_struct(struct zproto_args *args)
 "	 case %d:\n"
 "		 if (args->idx == 0) {\n"
 "			 int i = 0;\n"
-"			 maptoarray.clear();\n"
+"			 maptoarray.resize(%s.size());\n"
 "			 for (auto &iter:%s)\n"
 "				 maptoarray[i++] = &iter.second;\n"
 "		 }\n"
 "		 if (args->idx >= (int)maptoarray.size()) {\n"
+"			 maptoarray.clear();\n"
+"			 maptoarray.shrink_to_fit();\n"
 "			 args->len = args->idx;\n"
 "			 return ZPROTO_NOFIELD;\n"
 "		 }\n"
@@ -94,7 +96,7 @@ fill_struct(struct zproto_args *args)
 
 	if (args->maptag) {
 		assert(args->idx >= 0);
-		snprintf(buff, 1024, mfmt, args->tag, args->name, zproto_name(args->sttype));
+		snprintf(buff, 1024, mfmt, args->tag, args->name, args->name, zproto_name(args->sttype));
 	} else if (args->idx >= 0) {
 		snprintf(buff, 1024, afmt, args->tag, args->name, args->name);
 	} else {

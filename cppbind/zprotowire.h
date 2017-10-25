@@ -34,7 +34,6 @@ protected:
 protected:
 	virtual int _encode_field(struct zproto_args *args) const = 0;
 	virtual int _decode_field(struct zproto_args *args) = 0;
-	mutable std::unordered_map<int, const void *> maptoarray;
 public:
 	virtual const char *_name() const = 0;
 };

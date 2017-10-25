@@ -11,6 +11,7 @@ static std::unordered_set<struct zproto_struct *> defined;
 
 struct prototype_args {
 	int level;
+	int hasmap = 0;
 	std::vector<std::string> type;
 	std::vector<std::string> fields;
 	std::vector<std::string> encode;
@@ -20,6 +21,7 @@ const char *funcproto = "\
 %sprotected:\n\
 %svirtual int _encode_field(struct zproto_args *args) const;\n\
 %svirtual int _decode_field(struct zproto_args *args);\n\
+%s\
 %spublic:\n\
 %svirtual const char *_name() const;\n\
 ";
@@ -42,6 +44,7 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
 {
 	std::string t1 = tab(newargs.level);
 	std::string t2 = tab(newargs.level - 1);
+	std::string mapbuf;
 	char buff[2048];
 
 	zproto_travel(st, prototype_cb, &newargs);
@@ -60,10 +63,13 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
 	newargs.fields.insert(
 		newargs.fields.begin(),
                 t2 + "struct " + zproto_name(st) + herit + "{\n");
+	if (newargs.hasmap)
+		mapbuf = t1 + "mutable std::vector<const void *>maptoarray;\n";
 	//member function
         snprintf(buff, 2048, funcproto,
 			t2.c_str(),
 			t1.c_str(), t1.c_str(),
+			mapbuf.c_str(),
 			t2.c_str(),
 			t1.c_str());
 	newargs.fields.push_back(buff);
@@ -126,6 +132,7 @@ prototype_cb(struct zproto_args *args)
 		assert(fud.type != "");
 		str = "std::unordered_map<" + fud.type + ", %s> %s;\n";
 		type = tab(ud->level) + str;
+		ud->hasmap = 1;
 	} else if(args->idx >= 0) {
 		type = tab(ud->level) + "std::vector<%s> %s;\n";
 	} else {
