@@ -122,7 +122,7 @@ prototype_cb(struct zproto_args *args)
 	char buff[2048];
 	std::string type;
 	std::string subtype;
-
+	std::string defval;
 	if (args->maptag) {
 		std::string str;
 		assert(args->idx >= 0);
@@ -130,13 +130,24 @@ prototype_cb(struct zproto_args *args)
 		fud.tag = args->maptag;
 		zproto_travel(args->sttype, find_field_type, &fud);
 		assert(fud.type != "");
-		str = "std::unordered_map<" + fud.type + ", %s> %s;\n";
+		str = "std::unordered_map<" + fud.type + ", %s> %s%s;\n";
 		type = tab(ud->level) + str;
 		ud->hasmap = 1;
 	} else if(args->idx >= 0) {
-		type = tab(ud->level) + "std::vector<%s> %s;\n";
+		type = tab(ud->level) + "std::vector<%s> %s%s;\n";
 	} else {
-		type = tab(ud->level) + "%s %s;\n";
+		type = tab(ud->level) + "%s %s%s;\n";
+		switch (args->type) {
+		case ZPROTO_BOOLEAN:
+			defval = " = false";
+			break;
+		case ZPROTO_INTEGER:
+			defval = " = 0";
+			break;
+		case ZPROTO_FLOAT:
+			defval = " = 0.0f";
+			break;
+		}
 	}
 
 	switch (args->type) {
@@ -163,7 +174,7 @@ prototype_cb(struct zproto_args *args)
 	default:
 		break;
 	}
-	snprintf(buff, 2048, type.c_str(), subtype.c_str(),args->name);
+	snprintf(buff, 2048, type.c_str(), subtype.c_str(),args->name, defval.c_str());
 	type = buff;
 	ud->fields.push_back(type);
 	return 0;
