@@ -1,5 +1,5 @@
 CC=g++
-CCFLAG=-Wall -Wextra -g -std=c++0x -I../
+CCFLAG=-Wall -Wextra -O2 -g -std=c++0x -I../
 
 zproto:zproto.o header.cpp body.cpp
 	$(CC) $(CCFLAG) -o zproto proto.cpp header.cpp body.cpp zproto.o
@@ -16,7 +16,7 @@ zprotowire.o:zprotowire.cpp
 	$(CC) $(CCFLAG) -c $<
 
 zproto.o:../zproto.c
-	gcc -Wall -g -c ../zproto.c
+	gcc -Wall -g -O2 -c ../zproto.c
 
 
 
