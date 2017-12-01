@@ -46,7 +46,8 @@ int main()
 	pk.luck.push_back(5);
 	pk.address1.push_back("hello");
 	pk.address1.push_back("world");
-	int sz = pk._serialize(dat);
+	int sz = pk._serializesafe(dat);
+	printf("tag:%x\n", pk._tag());
 	printf("encode1 size:%d\n", sz);
 	print_hex((uint8_t *)dat.c_str(), dat.size());
 	datsize = pk._serialize(&datbuf);

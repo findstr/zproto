@@ -120,16 +120,24 @@ int
 wire::_serialize(std::string &dat) const
 {
 	(void)dat;
-	assert(!"not implement");
 	return 0;
 }
+
 int
 wire::_serialize(const uint8_t **data) const
 {
 	(void)data;
-	assert(!"not implement");
 	return 0;
 }
+
+int
+wire::_serializesafe(std::string &dat, int presize) const
+{
+	(void)dat;
+	(void)presize;
+	return 0;
+}
+
 int
 wire::_parse(const std::string &dat)
 {
@@ -143,6 +151,14 @@ wire::_parse(const uint8_t *data, int datasz)
 	(void)datasz;
 	return 0;
 }
+
+int
+wire::_tag() const
+{
+	return 0;
+}
+
+
 //syntax tree
 
 wiretree::wiretree(const char *proto)
@@ -159,7 +175,7 @@ wiretree::wiretree(const char *proto)
 wiretree::~wiretree()
 {
 	zproto_free(z);
-	delete buff;
+	delete[] buff;
 }
 
 
@@ -168,8 +184,7 @@ wiretree::expand()
 {
 	size_t newsz = buffsz * 2;
 	uint8_t *newbuff = new uint8_t[newsz];
-	memcpy(newbuff, buff, buffsz);
-	delete buff;
+	delete[] buff;
 	buffsz = newsz;
 	buff = newbuff;
 	return ;
@@ -229,6 +244,36 @@ wiretree::encode(const wire &w, std::string &dat)
 	return sz;
 }
 
+
+int
+wiretree::encodesafe(const wire &w, std::string &dat, int presize)
+{
+	int sz;
+	uint8_t *tmpbuf = new uint8_t[presize];
+	struct zproto_struct *st = query(w._name());
+	for (;;) {
+		sz = w._encode(tmpbuf, presize, st);
+		if (sz == ZPROTO_ERROR) {
+			delete[] tmpbuf;
+			return sz;
+		}
+		if (sz == ZPROTO_OOM) {
+			size_t newsz = presize * 2;
+			uint8_t *newbuf = new uint8_t[newsz];
+			delete[] tmpbuf;
+			tmpbuf = newbuf;
+			presize = newsz;
+			continue;
+		}
+		dat.assign((char *)tmpbuf, sz);
+		delete[] tmpbuf;
+		return sz;
+	}
+	//never come here
+	delete[] tmpbuf;
+	return ZPROTO_ERROR;
+}
+
 int
 wiretree::decode(wire &w, const std::string &dat)
 {
@@ -242,6 +287,13 @@ wiretree::decode(wire &w, const uint8_t *dat, size_t datasz)
 	struct zproto_struct *st = query(w._name());
 	sz = w._decode((uint8_t *)dat, datasz, st);
 	return sz;
+}
+
+int
+wiretree::tag(const wire &w)
+{
+	struct zproto_struct *st = query(w._name());
+	return zproto_tag(st);
 }
 
 }

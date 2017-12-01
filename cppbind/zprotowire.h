@@ -19,8 +19,10 @@ public:
 public:
         virtual int _serialize(std::string &dat) const;
         virtual int _serialize(const uint8_t **data) const;
+        virtual int _serializesafe(std::string &dat, int presize = 1024) const;
         virtual int _parse(const std::string &dat);
         virtual int _parse(const uint8_t *data, int datasz);
+	virtual int _tag() const;
 protected:
 	int _write(struct zproto_args *args, uint8_t val) const;
 	int _write(struct zproto_args *args, uint32_t val) const;
@@ -44,8 +46,10 @@ public:
 	~wiretree();
 	int encode(const wire &w, std::string &dat);
 	int encode(const wire &w, const uint8_t **data);
+	int encodesafe(const wire &w, std::string &dat, int presize = 1024);
 	int decode(wire &w, const std::string &dat);
 	int decode(wire &w, const uint8_t *dat, size_t datasz);
+	int tag(const wire &w);
 private:
 	void expand();
 	int encodecheck(const wire &w);

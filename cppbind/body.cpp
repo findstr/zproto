@@ -305,6 +305,11 @@ static const char *wirep =
 "	return serializer::instance().encode(*this, dat);\n"
 "}\n"
 "int\n"
+"wirep::_serializesafe(std::string &dat, int presize) const\n"
+"{\n"
+"	return serializer::instance().encodesafe(*this, dat, presize);\n"
+"}\n"
+"int\n"
 "wirep::_serialize(const uint8_t **data) const\n"
 "{\n"
 "	return serializer::instance().encode(*this, data);\n"
@@ -318,6 +323,11 @@ static const char *wirep =
 "wirep::_parse(const uint8_t *data, int datasz)\n"
 "{\n"
 "	return serializer::instance().decode(*this, data, datasz);\n"
+"}\n"
+"int\n"
+"wirep::_tag() const\n"
+"{\n"
+"	return serializer::instance().tag(*this);\n"
 "}\n\n";
 void
 body(const char *name, std::vector<const char*> &space, const char *proto, struct zproto *z)
