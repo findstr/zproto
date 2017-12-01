@@ -30,23 +30,18 @@ print_struct(const hello::world::packet &pk)
 	printf("\n");
 }
 
-int main()
+static hello::world::packet pk;
+
+static void
+test_normal()
 {
 	std::string dat;
 	const uint8_t *datbuf;
 	int datsize;
-	hello::world::packet pk;
 	hello::world::packet pk2;
 	hello::world::packet pk3;
-	pk.phone[1].home = 0x3389;
-	pk.phone[1].work = 999.98;
-	pk.address = "ShangHai";
-	pk.luck.push_back(3);
-	pk.luck.push_back(7);
-	pk.luck.push_back(5);
-	pk.address1.push_back("hello");
-	pk.address1.push_back("world");
-	int sz = pk._serializesafe(dat);
+
+	int sz = pk._serialize(dat);
 	printf("tag:%x\n", pk._tag());
 	printf("encode1 size:%d\n", sz);
 	print_hex((uint8_t *)dat.c_str(), dat.size());
@@ -59,6 +54,46 @@ int main()
 	sz = pk3._parse(datbuf, datsize);
 	printf("decode2 size:%d\n", sz);
 	print_struct(pk3);
+}
+
+static void *
+test_thread(void *)
+{
+	int i;
+	hello::world::packet pkk = pk;
+	pkk.phone[1].home = 0x3389 + rand() % 10;
+	pkk.phone[1].work = 999.98 + rand() % 10;
+	std::string pk_dat;
+	pkk._serializesafe(pk_dat);
+	for (i = 0; i < 100; i++) {
+		std::string out;
+		pkk._serialize(out);
+		if (out != pk_dat)
+			printf("[multithread] _serialize memory corrupt\n");
+		pkk._serializesafe(out);
+		if (out != pk_dat)
+			printf("[multithread] _serializesafe memory corrupt\n");
+	}
+	return NULL;
+}
+
+
+int main()
+{
+	pthread_t pid1, pid2;
+	pk.phone[1].home = 0x3389;
+	pk.phone[1].work = 999.98;
+	pk.address = "ShangHai";
+	pk.luck.push_back(3);
+	pk.luck.push_back(7);
+	pk.luck.push_back(5);
+	pk.address1.push_back("hello");
+	pk.address1.push_back("world");
+	test_normal();
+	pthread_create(&pid1, NULL, test_thread, NULL);
+	pthread_create(&pid2, NULL, test_thread, NULL);
+	pthread_join(pid1, NULL);
+	pthread_join(pid2, NULL);
 	return 0;
 }
 
