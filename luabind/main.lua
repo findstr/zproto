@@ -119,9 +119,9 @@ end
 --test proto
 local function testproto()
 	print("========begin test proto===========")
-	local tag = proto:querytag("packet")
+	local tag = proto:tag("packet")
 	print("packet tag:", tag)
-	local tag = proto:querytag("info")
+	local tag = proto:tag("info")
 	print("info tag:", tag)
 	print("========stop test proto===========")
 end
