@@ -12,7 +12,7 @@ info 0xfd {
 packet 0xfe {
 	phone {
 		.home:integer 1
-		.work:integer 2
+		.work:long 2
 	}
 	dummy {
 	}
@@ -62,7 +62,7 @@ assert(proto)
 assert(newproto)
 
 local packet = {
-	phone = {home=0x123456, work=0x654321},
+	phone = {home=0x12345678abcf, work=0x654321},
 	info = {
 			{name = "lucy", age = 18.3, girl = false, boy = true},
 			{name="lilei", age = 24.5, girl = true, boy = false},
@@ -131,8 +131,13 @@ local function testwire()
 	print("=========begin test wire=============")
 	print("+++++++source table")
 	print("empty table", packet.empty, #packet.empty)
+	local buf = {}
 	print_r(packet)
 	local data = newproto:encode(0xfe, packet)
+	for i = 1, #data do
+		buf[#buf + 1] = string.format("%02x", data:byte(i))
+	end
+	print(table.concat(buf))
 	data = newproto:pack(data)
 	data = newproto:unpack(data)
 	local unpack = newproto:decode("packet", data)

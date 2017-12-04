@@ -343,6 +343,10 @@ prototype_cb(struct zproto_args *args)
 		subtype = "int";
 		goto gen;
 		break;
+	case ZPROTO_LONG:
+		subtype = "long";
+		goto gen;
+		break;
 	case ZPROTO_FLOAT:
 		subtype = "float";
 	gen:

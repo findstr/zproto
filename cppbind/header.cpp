@@ -103,6 +103,9 @@ find_field_type(struct zproto_args *args)
 		case ZPROTO_INTEGER:
 			ud->type = "uint32_t";
 			break;
+		case ZPROTO_LONG:
+			ud->type = "uint64_t";
+			break;
 		case ZPROTO_FLOAT:
 			ud->type = "float";
 			break;
@@ -141,6 +144,7 @@ prototype_cb(struct zproto_args *args)
 		case ZPROTO_BOOLEAN:
 			defval = " = false";
 			break;
+		case ZPROTO_LONG:
 		case ZPROTO_INTEGER:
 			defval = " = 0";
 			break;
@@ -167,6 +171,9 @@ prototype_cb(struct zproto_args *args)
 		break;
 	case ZPROTO_INTEGER:
 		subtype = "uint32_t";
+		break;
+	case ZPROTO_LONG:
+		subtype = "uint64_t";
 		break;
 	case ZPROTO_FLOAT:
 		subtype = "float";

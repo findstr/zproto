@@ -240,6 +240,7 @@ prototype_cb(struct zproto_args *args)
 	case ZPROTO_STRING:
 	case ZPROTO_BOOLEAN:
 	case ZPROTO_INTEGER:
+	case ZPROTO_LONG:
 	case ZPROTO_FLOAT:
 		estm = fill_normal(args);
 		dstm = to_normal(args);

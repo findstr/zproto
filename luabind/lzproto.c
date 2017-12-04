@@ -101,6 +101,7 @@ struct lencode_ud {
 
 #define uint8(ptr)    (*(uint8_t *)ptr)
 #define uint32(ptr)   (*(uint32_t *)ptr)
+#define uint64(ptr)   (*(uint64_t *)ptr)
 #define float32(ptr)  (*(float *)ptr)
 
 static int encode_table(struct zproto_args *args);
@@ -127,6 +128,14 @@ encode_field(struct zproto_args *args)
 		int32_t d = luaL_checkinteger(L, -1);
 		uint32(args->buff) = (uint32_t)d;
 		return sizeof(uint32_t);
+	}
+	case ZPROTO_LONG: {
+		if (lua_type(L, -1) != LUA_TNUMBER)
+			return luaL_error(L, "encode_data need long field:%s\n", name);
+		CHECK_OOM(args->buffsz, sizeof(uint64_t));
+		long d = luaL_checkinteger(L, -1);
+		uint64(args->buff) = (uint64_t)d;
+		return sizeof(uint64_t);
 	}
 	case ZPROTO_FLOAT: {
 		if (lua_type(L, -1) != LUA_TNUMBER)
@@ -288,6 +297,10 @@ decode_field(struct zproto_args *args, int dupidx)
 		break;
 	case ZPROTO_INTEGER:
 		lua_pushinteger(L, uint32(args->buff));
+		ret = args->buffsz;
+		break;
+	case ZPROTO_LONG:
+		lua_pushinteger(L, uint64(args->buff));
 		ret = args->buffsz;
 		break;
 	case ZPROTO_FLOAT:

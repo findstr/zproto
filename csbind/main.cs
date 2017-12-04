@@ -16,8 +16,8 @@ namespace test
 		obj.phoneval = new packet.phone[1];
 		obj.phoneval[0] = new packet.phone();
 		obj.address = enc.GetBytes("hello");
-		obj.luck = new int[1];
-		obj.luck[0] = 3;
+		obj.luck = new long[1];
+		obj.luck[0] = 0x1122334455;
 		obj.address1 = new byte[1][];
 		obj.address1[0] = enc.GetBytes("world");
 		obj._serialize(out data);

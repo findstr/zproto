@@ -51,6 +51,11 @@ wire::_write(struct zproto_args *args, uint32_t val) const
 {
 	return write(args, val);
 }
+int
+wire::_write(struct zproto_args *args, uint64_t val) const
+{
+	return write(args, val);
+}
 
 int
 wire::_write(struct zproto_args *args, float val) const
@@ -75,6 +80,12 @@ wire::_read(struct zproto_args *args, uint8_t &val)
 
 int
 wire::_read(struct zproto_args *args, uint32_t &val)
+{
+	return read(args, val);
+}
+
+int
+wire::_read(struct zproto_args *args, uint64_t &val)
 {
 	return read(args, val);
 }
