@@ -39,7 +39,7 @@ info 0xfd {
 packet 0xfe {
 	phone {
 		.home:integer 1
-		.work:integer 2
+		.work:long 2
 	}
 	dummy {
 	}

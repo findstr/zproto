@@ -125,7 +125,7 @@ encode_field(struct zproto_args *args)
 		if (lua_type(L, -1) != LUA_TNUMBER)
 			return luaL_error(L, "encode_data:need integer field:%s\n", name);
 		CHECK_OOM(args->buffsz, sizeof(uint32_t))
-		int32_t d = luaL_checkinteger(L, -1);
+		lua_Integer d = luaL_checkinteger(L, -1);
 		uint32(args->buff) = (uint32_t)d;
 		return sizeof(uint32_t);
 	}
@@ -133,7 +133,7 @@ encode_field(struct zproto_args *args)
 		if (lua_type(L, -1) != LUA_TNUMBER)
 			return luaL_error(L, "encode_data need long field:%s\n", name);
 		CHECK_OOM(args->buffsz, sizeof(uint64_t));
-		long d = luaL_checkinteger(L, -1);
+		lua_Integer d = luaL_checkinteger(L, -1);
 		uint64(args->buff) = (uint64_t)d;
 		return sizeof(uint64_t);
 	}
