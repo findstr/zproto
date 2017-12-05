@@ -12,6 +12,7 @@ struct stmt_args {
 	std::string base;
 	std::vector<std::string> encodestm;
 	std::vector<std::string> decodestm;
+	std::vector<std::string> resetstm;
 	std::vector<std::string> stmts;
 };
 
@@ -59,6 +60,36 @@ to_normal(struct zproto_args *args)
 		snprintf(buff, 512, afmt, args->tag, args->name, args->name);
 	else
 		snprintf(buff, 512, fmt, args->tag, args->name);
+	return buff;
+}
+
+static std::string inline
+reset_normal(struct zproto_args *args)
+{
+	const char *fmt = "";
+	char buff[1024];
+	if (args->idx >= 0) {
+		fmt = "\t%s.clear();\n";
+	} else {
+		switch (args->type) {
+		case ZPROTO_STRING:
+			fmt = "\t%s.clear();\n";
+			break;
+		case ZPROTO_BOOLEAN:
+			fmt = "\t%s = false;\n";
+			break;
+		case ZPROTO_INTEGER:
+			fmt = "\t%s = 0;\n";
+			break;
+		case ZPROTO_LONG:
+			fmt = "\t%s = 0;\n";
+			break;
+		case ZPROTO_FLOAT:
+			fmt = "\t%s = 0.0f;\n";
+			break;
+		}
+	}
+	snprintf(buff, 1024, fmt, args->name);
 	return buff;
 }
 
@@ -143,6 +174,16 @@ to_struct(struct zproto_args *args)
 	return buff;
 }
 
+static std::string inline
+reset_struct(struct zproto_args *args)
+{
+	char buff[1024];
+	if (args->idx >= 0)
+		snprintf(buff, 1024, "\t%s.clear();\n", args->name);
+	else
+		snprintf(buff, 1024, "\t%s._reset();\n", args->name);
+	return buff;
+}
 
 static std::string inline
 format_code(const char *base, const char *name, const char *qualifier)
@@ -170,6 +211,19 @@ format_close()
 }
 
 static std::string inline
+format_reset(const char *base)
+{
+	static const char *fmt =
+	"void\n"
+	"%s::_reset()\n"
+	"{\n";
+	char buff[1024];
+	snprintf(buff, 1024, fmt, base);
+	return buff;
+}
+
+
+static std::string inline
 format_name(const char *base)
 {
 	static const char *fmt =
@@ -195,6 +249,12 @@ formatst(struct zproto_struct *st, struct stmt_args &newargs)
 	//name
 	tmp = format_name(newargs.base.c_str());
 	newargs.stmts.push_back(tmp);
+	//_reset()
+	tmp = format_reset(newargs.base.c_str());
+	newargs.resetstm.insert(newargs.resetstm.begin(), tmp);
+	newargs.resetstm.push_back("\n}\n");
+	newargs.stmts.insert(newargs.stmts.end(), newargs.resetstm.begin(),
+			newargs.resetstm.end());
 	//_encode_field
 	tmp = format_code(newargs.base.c_str(), "_encode_field", "const");
 	newargs.encodestm.insert(newargs.encodestm.begin(), tmp);
@@ -210,7 +270,7 @@ formatst(struct zproto_struct *st, struct stmt_args &newargs)
 	newargs.decodestm.push_back(tmp);
 	newargs.stmts.insert(newargs.stmts.end(), newargs.decodestm.begin(),
 			newargs.decodestm.end());
-
+	//
 	defined.insert(st);
 	return ;
 }
@@ -222,6 +282,7 @@ prototype_cb(struct zproto_args *args)
 	struct stmt_args newargs;
 	std::string estm;
 	std::string dstm;
+	std::string rstm;
 
 	switch (args->type) {
 	case ZPROTO_STRUCT:
@@ -236,6 +297,7 @@ prototype_cb(struct zproto_args *args)
 		}
 		estm = fill_struct(args);
 		dstm = to_struct(args);
+		rstm = reset_struct(args);
 		break;
 	case ZPROTO_STRING:
 	case ZPROTO_BOOLEAN:
@@ -244,12 +306,14 @@ prototype_cb(struct zproto_args *args)
 	case ZPROTO_FLOAT:
 		estm = fill_normal(args);
 		dstm = to_normal(args);
+		rstm = reset_normal(args);
 		break;
 	default:
 		break;
 	}
 	ud->encodestm.push_back(estm);
 	ud->decodestm.push_back(dstm);
+	ud->resetstm.push_back(rstm);
 	return 0;
 }
 

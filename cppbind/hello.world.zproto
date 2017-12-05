@@ -9,6 +9,9 @@ packet 0xfe {
 	.address:string 3
 	.luck:long[] 4
 	.address1:string[] 5
+	.ii:integer 6
+	.ff:float 7
+	.ll:long 8
 }
 
 

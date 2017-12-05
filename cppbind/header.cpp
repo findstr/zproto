@@ -24,6 +24,7 @@ const char *funcproto = "\
 %s\
 %spublic:\n\
 %svirtual const char *_name() const;\n\
+%svirtual void _reset();\n\
 ";
 
 static std::string
@@ -71,6 +72,7 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
 			t1.c_str(), t1.c_str(),
 			mapbuf.c_str(),
 			t2.c_str(),
+			t1.c_str(),
 			t1.c_str());
 	newargs.fields.push_back(buff);
 
@@ -227,7 +229,7 @@ const char *wirep =
 "        virtual int _serialize(const uint8_t **data) const;\n"
 "        virtual int _parse(const std::string &dat);\n"
 "        virtual int _parse(const uint8_t *data, int datasz);\n"
-"	 virtual int _tag() const;\n"
+"        virtual int _tag() const;\n"
 "};\n\n";
 
 void

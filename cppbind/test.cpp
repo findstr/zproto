@@ -54,6 +54,14 @@ test_normal()
 	sz = pk3._parse(datbuf, datsize);
 	printf("decode2 size:%d\n", sz);
 	print_struct(pk3);
+	pk3._reset();
+	assert(pk3.phone.size() == 0);
+	assert(pk3.address.size() == 0);
+	assert(pk3.luck.size() == 0);
+	assert(pk3.address1.size() == 0);
+	assert(pk3.ii == 0);
+	assert(pk3.ff == 0.0f);
+	assert(pk3.ll == 0);
 }
 
 static void *
@@ -89,6 +97,9 @@ int main()
 	pk.luck.push_back(5);
 	pk.address1.push_back("hello");
 	pk.address1.push_back("world");
+	pk.ii = 6;
+	pk.ff = 7.0f;
+	pk.ll = 8;
 	test_normal();
 	pthread_create(&pid1, NULL, test_thread, NULL);
 	pthread_create(&pid2, NULL, test_thread, NULL);

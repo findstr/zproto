@@ -23,6 +23,7 @@ public:
         virtual int _parse(const std::string &dat);
         virtual int _parse(const uint8_t *data, int datasz);
 	virtual int _tag() const;
+	virtual void _reset();
 protected:
 	int _write(struct zproto_args *args, uint8_t val) const;
 	int _write(struct zproto_args *args, uint32_t val) const;

@@ -169,6 +169,12 @@ wire::_tag() const
 	return 0;
 }
 
+void
+wire::_reset()
+{
+	//empty
+}
+
 
 //syntax tree
 
