@@ -17,13 +17,14 @@ static void
 print_struct(const hello::world::packet &pk)
 {
 	for (auto &iter:pk.phone) {
-		printf("packet::phone[%f]::home:0x%x\n", iter.first, iter.second.home);
+		printf("packet::phone[%f]::home:%d\n", iter.first, iter.second.home);
 		printf("packet::phone[%f]::work:%f\n", iter.first, iter.second.work);
 	}
 	printf("packet::address:%s\n", pk.address.c_str());
+	printf("packet::bb:%s\n", pk.bb ? "true" : "false");
 	printf("packet::luck size:%lu\n", pk.luck.size());
 	for (size_t i = 0; i < pk.luck.size(); i++)
-		printf("%d ", pk.luck[i]);
+		printf("%ld ", pk.luck[i]);
 	printf("\n");
 	for (const auto &iter:pk.address1)
 		printf("packet::address1 %s\n", iter.c_str());
@@ -62,6 +63,7 @@ test_normal()
 	assert(pk3.ii == 0);
 	assert(pk3.ff == 0.0f);
 	assert(pk3.ll == 0);
+	assert(pk3.bb == false);
 }
 
 static void *
@@ -89,8 +91,9 @@ test_thread(void *)
 int main()
 {
 	pthread_t pid1, pid2;
-	pk.phone[1].home = 0x3389;
+	pk.phone[1].home = -3389;
 	pk.phone[1].work = 999.98;
+	pk.phone[1].main = false;
 	pk.address = "ShangHai";
 	pk.luck.push_back(3);
 	pk.luck.push_back(7);
@@ -100,6 +103,7 @@ int main()
 	pk.ii = 6;
 	pk.ff = 7.0f;
 	pk.ll = 8;
+	pk.bb = true;
 	test_normal();
 	pthread_create(&pid1, NULL, test_thread, NULL);
 	pthread_create(&pid2, NULL, test_thread, NULL);

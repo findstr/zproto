@@ -3,6 +3,7 @@ packet 0xfe {
 	phone {
 		.home:integer 1
 		.work:float 2
+		.main:boolean 3
 	}
 	#中文注释
 	.phone:phone[work] 1
@@ -12,6 +13,7 @@ packet 0xfe {
 	.ii:integer 6
 	.ff:float 7
 	.ll:long 8
+	.bb:boolean 9
 }
 
 

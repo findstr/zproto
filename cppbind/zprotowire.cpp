@@ -41,18 +41,19 @@ read(struct zproto_args *args, T &val)
 }
 
 int
-wire::_write(struct zproto_args *args, uint8_t val) const
+wire::_write(struct zproto_args *args, bool val) const
 {
-	return write(args, val);
+	uint8_t b = val ? 1 : 0;
+	return write(args, b);
 }
 
 int
-wire::_write(struct zproto_args *args, uint32_t val) const
+wire::_write(struct zproto_args *args, int32_t val) const
 {
 	return write(args, val);
 }
 int
-wire::_write(struct zproto_args *args, uint64_t val) const
+wire::_write(struct zproto_args *args, int64_t val) const
 {
 	return write(args, val);
 }
@@ -73,19 +74,23 @@ wire::_write(struct zproto_args *args, const std::string &val) const
 }
 
 int
-wire::_read(struct zproto_args *args, uint8_t &val)
+wire::_read(struct zproto_args *args, bool &val)
+{
+	int ret;
+	uint8_t b = 0;
+	ret = read(args, b);
+	val = (b == 1) ? true : false;
+	return ret;
+}
+
+int
+wire::_read(struct zproto_args *args, int32_t &val)
 {
 	return read(args, val);
 }
 
 int
-wire::_read(struct zproto_args *args, uint32_t &val)
-{
-	return read(args, val);
-}
-
-int
-wire::_read(struct zproto_args *args, uint64_t &val)
+wire::_read(struct zproto_args *args, int64_t &val)
 {
 	return read(args, val);
 }

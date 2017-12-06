@@ -11,8 +11,9 @@ info 0xfd {
 
 packet 0xfe {
 	phone {
-		.home:integer 1
-		.work:long 2
+		.home:long 1
+		.work:integer 2
+		.negwork:long 3
 	}
 	dummy {
 	}
@@ -38,8 +39,9 @@ info 0xfd {
 
 packet 0xfe {
 	phone {
-		.home:integer 1
-		.work:long 2
+		.home:long 1
+		.work:integer 2
+		.negwork:long 3
 	}
 	dummy {
 	}
@@ -62,13 +64,13 @@ assert(proto)
 assert(newproto)
 
 local packet = {
-	phone = {home=0x12345678abcf, work=0x654321},
+	phone = {home=0x12345678abcf, work=654321, negwork = -654321},
 	info = {
 			{name = "lucy", age = 18.3, girl = false, boy = true},
 			{name="lilei", age = 24.5, girl = true, boy = false},
 		},
 	address = "China.shanghai",
-	luck = {1, 3, 9},
+	luck = {1, -3, 9},
 	empty = {},
 	new = {
 		{name = "hanmeimei", age=25, girl = true, boy = false, new = {"hnew1", "hnew2"}},
@@ -116,6 +118,19 @@ local function round8(str)
 	return r
 end
 
+local function test_eq(a, b)
+	if b == nil then
+		return
+	end
+	for k, v in pairs(a) do
+		if type(v) == "table" then
+			test_eq(v, b[k])
+		else
+			assert(v == b[k])
+		end
+	end
+end
+
 --test proto
 local function testproto()
 	print("========begin test proto===========")
@@ -144,6 +159,7 @@ local function testwire()
 	print("------dest table", unpack)
 	print("empty table", unpack.empty, #unpack.empty)
 	print_r(unpack)
+	test_eq(unpack, packet)
 	print("=========stop test wire=============")
 end
 

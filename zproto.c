@@ -627,10 +627,10 @@ encode_field(struct zproto_args *args, zproto_cb_t cb)
 		return cb(args);
 	case ZPROTO_INTEGER:
 	case ZPROTO_FLOAT:
-		CHECK_OOM(args->buffsz, sizeof(uint32_t))
+		CHECK_OOM(args->buffsz, sizeof(int32_t))
 		return cb(args);
 	case ZPROTO_LONG:
-		CHECK_OOM(args->buffsz, sizeof(uint64_t));
+		CHECK_OOM(args->buffsz, sizeof(int64_t));
 		return cb(args);
 	case ZPROTO_STRING:
 		CHECK_OOM(args->buffsz, sizeof(len_t))
@@ -759,12 +759,12 @@ decode_field(struct zproto_args *args, zproto_cb_t cb)
 		return cb(args);
 	case ZPROTO_INTEGER:
 	case ZPROTO_FLOAT:
-		CHECK_VALID(args->buffsz, sizeof(uint32_t))
-		args->buffsz = sizeof(uint32_t);
+		CHECK_VALID(args->buffsz, sizeof(int32_t))
+		args->buffsz = sizeof(int32_t);
 		return cb(args);
 	case ZPROTO_LONG:
-		CHECK_VALID(args->buffsz, sizeof(uint64_t))
-		args->buffsz = sizeof(uint64_t);
+		CHECK_VALID(args->buffsz, sizeof(int64_t))
+		args->buffsz = sizeof(int64_t);
 		return cb(args);
 	case ZPROTO_STRING:
 		CHECK_VALID(args->buffsz, sizeof(len_t))

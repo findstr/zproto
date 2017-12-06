@@ -100,13 +100,13 @@ find_field_type(struct zproto_args *args)
 			ud->type = "std::string";
 			break;
 		case ZPROTO_BOOLEAN:
-			ud->type = "uint8_t";
+			ud->type = "bool";
 			break;
 		case ZPROTO_INTEGER:
-			ud->type = "uint32_t";
+			ud->type = "int32_t";
 			break;
 		case ZPROTO_LONG:
-			ud->type = "uint64_t";
+			ud->type = "int64_t";
 			break;
 		case ZPROTO_FLOAT:
 			ud->type = "float";
@@ -172,10 +172,10 @@ prototype_cb(struct zproto_args *args)
 		subtype = "bool";
 		break;
 	case ZPROTO_INTEGER:
-		subtype = "uint32_t";
+		subtype = "int32_t";
 		break;
 	case ZPROTO_LONG:
-		subtype = "uint64_t";
+		subtype = "int64_t";
 		break;
 	case ZPROTO_FLOAT:
 		subtype = "float";
