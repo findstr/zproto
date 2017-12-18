@@ -110,24 +110,26 @@ fill_struct(struct zproto_args *args)
 "		 return %s[args->idx]._encode(args->buff, args->buffsz, args->sttype);\n";
 
 	const char *mfmt =
-"	 case %d:\n"
+"	 case %d: {\n"
+"		 int ret;\n"
 "		 if (args->idx == 0) {\n"
-"			 int i = 0;\n"
-"			 maptoarray.resize(%s.size());\n"
-"			 for (auto &iter:%s)\n"
-"				 maptoarray[i++] = &iter.second;\n"
+"			 _mapiterator.%s = %s.begin();\n"
 "		 }\n"
-"		 if (args->idx >= (int)maptoarray.size()) {\n"
-"			 maptoarray.clear();\n"
-"			 maptoarray.shrink_to_fit();\n"
+"		 if (_mapiterator.%s == %s.end()) {\n"
 "			 args->len = args->idx;\n"
 "			 return ZPROTO_NOFIELD;\n"
 "		 }\n"
-"		 return ((struct %s *)maptoarray[args->idx])->_encode(args->buff, args->buffsz, args->sttype);\n";
+"		 ret = _mapiterator.%s->second._encode(args->buff, args->buffsz, args->sttype);\n"
+"		 ++_mapiterator.%s;\n"
+"		 return ret;}\n";
 
 	if (args->maptag) {
 		assert(args->idx >= 0);
-		snprintf(buff, 1024, mfmt, args->tag, args->name, args->name, zproto_name(args->sttype));
+		snprintf(buff, 1024, mfmt, args->tag,
+				args->name, args->name,
+				args->name, args->name,
+				args->name,
+				args->name);
 	} else if (args->idx >= 0) {
 		snprintf(buff, 1024, afmt, args->tag, args->name, args->name);
 	} else {

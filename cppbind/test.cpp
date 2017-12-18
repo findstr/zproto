@@ -17,8 +17,12 @@ static void
 print_struct(const hello::world::packet &pk)
 {
 	for (auto &iter:pk.phone) {
-		printf("packet::phone[%f]::home:%d\n", iter.first, iter.second.home);
-		printf("packet::phone[%f]::work:%f\n", iter.first, iter.second.work);
+		printf("packet::phone[%d]::home:%d\n", iter.first, iter.second.home);
+		printf("packet::phone[%d]::work:%f\n", iter.first, iter.second.work);
+	}
+	for (auto &iter:pk.phone2) {
+		printf("packet::phone2[%f]::home:%d\n", iter.first, iter.second.home);
+		printf("packet::phone2[%f]::work:%f\n", iter.first, iter.second.work);
 	}
 	printf("packet::address:%s\n", pk.address.c_str());
 	printf("packet::bb:%s\n", pk.bb ? "true" : "false");
@@ -94,6 +98,10 @@ int main()
 	pk.phone[1].home = -3389;
 	pk.phone[1].work = 999.98;
 	pk.phone[1].main = false;
+	pk.phone2[999.98].home = -3399;
+	pk.phone2[999.98].work = 999.98;
+	pk.phone2[999.98].main = true;
+
 	pk.address = "ShangHai";
 	pk.luck.push_back(3);
 	pk.luck.push_back(7);

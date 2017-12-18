@@ -6,7 +6,8 @@ packet 0xfe {
 		.main:boolean 3
 	}
 	#中文注释
-	.phone:phone[work] 1
+	.phone:phone[home] 1
+	.phone2:phone[work] 2
 	.address:string 3
 	.luck:long[] 4
 	.address1:string[] 5

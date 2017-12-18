@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <vector>
 #include <string>
+#include <sstream>
 #include <unordered_set>
 
 #include "zproto.hpp"
@@ -11,14 +12,15 @@ static std::unordered_set<struct zproto_struct *> defined;
 
 struct prototype_args {
 	int level;
-	int hasmap = 0;
 	std::vector<std::string> type;
 	std::vector<std::string> fields;
 	std::vector<std::string> encode;
+	std::vector<std::string> iters;
 };
 
 const char *funcproto = "\
 %sprotected:\n\
+%s\
 %svirtual int _encode_field(struct zproto_args *args) const;\n\
 %svirtual int _decode_field(struct zproto_args *args);\n\
 %s\
@@ -45,7 +47,8 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
 {
 	std::string t1 = tab(newargs.level);
 	std::string t2 = tab(newargs.level - 1);
-	std::string mapbuf;
+	std::string iterwrapper;
+	std::string iterdefine;
 	char buff[2048];
 
 	zproto_travel(st, prototype_cb, &newargs);
@@ -64,13 +67,23 @@ formatst(struct zproto_struct *st, struct prototype_args &newargs)
 	newargs.fields.insert(
 		newargs.fields.begin(),
                 t2 + "struct " + zproto_name(st) + herit + "{\n");
-	if (newargs.hasmap)
-		mapbuf = t1 + "mutable std::vector<const void *>maptoarray;\n";
+	if (newargs.iters.size()) {
+		std::stringstream ss;
+		ss << t1 << "union iterator_wrapper {\n";
+		ss << t1 << t1 << "iterator_wrapper(){};\n";
+		for (const auto &iter:newargs.iters)
+			ss << t1 << t1 << iter;
+		ss << t1 << "};\n";
+		iterwrapper = ss.str();
+		iterdefine = t1 + "mutable union iterator_wrapper _mapiterator;\n";
+	}
 	//member function
         snprintf(buff, 2048, funcproto,
 			t2.c_str(),
-			t1.c_str(), t1.c_str(),
-			mapbuf.c_str(),
+			iterwrapper.c_str(),
+			t1.c_str(),
+			t1.c_str(),
+			iterdefine.c_str(),
 			t2.c_str(),
 			t1.c_str(),
 			t1.c_str());
@@ -126,6 +139,7 @@ prototype_cb(struct zproto_args *args)
 	struct prototype_args newargs;
 	char buff[2048];
 	std::string type;
+	std::string iter;
 	std::string subtype;
 	std::string defval;
 	if (args->maptag) {
@@ -136,8 +150,8 @@ prototype_cb(struct zproto_args *args)
 		zproto_travel(args->sttype, find_field_type, &fud);
 		assert(fud.type != "");
 		str = "std::unordered_map<" + fud.type + ", %s> %s%s;\n";
+		iter = "std::unordered_map<" + fud.type + ", %s>::const_iterator %s;\n";
 		type = tab(ud->level) + str;
-		ud->hasmap = 1;
 	} else if(args->idx >= 0) {
 		type = tab(ud->level) + "std::vector<%s> %s%s;\n";
 	} else {
@@ -183,9 +197,12 @@ prototype_cb(struct zproto_args *args)
 	default:
 		break;
 	}
-	snprintf(buff, 2048, type.c_str(), subtype.c_str(),args->name, defval.c_str());
-	type = buff;
-	ud->fields.push_back(type);
+	snprintf(buff, 2048, type.c_str(), subtype.c_str(), args->name, defval.c_str());
+	ud->fields.push_back(buff);
+	if (iter.size()) {
+		snprintf(buff, 2048, iter.c_str(), subtype.c_str(), args->name);
+		ud->iters.push_back(buff);
+	}
 	return 0;
 }
 
