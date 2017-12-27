@@ -25,7 +25,7 @@ decode_cb(struct zproto_args *arg)
 template<typename T> int
 write(struct zproto_args *args, T val)
 {
-	if (args->buffsz < sizeof(T))
+	if (args->buffsz < (int)sizeof(T))
 		return ZPROTO_OOM;
 	(*(T *)args->buff) = val;
 	return sizeof(T);
@@ -34,7 +34,7 @@ write(struct zproto_args *args, T val)
 template<typename T> int
 read(struct zproto_args *args, T &val)
 {
-	if (args->buffsz < sizeof(T))
+	if (args->buffsz < (int)sizeof(T))
 		return ZPROTO_ERROR;
 	val = (*(T *)args->buff);
 	return sizeof(T);
