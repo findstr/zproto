@@ -692,19 +692,12 @@ zproto_encode(struct zproto_struct *st, uint8_t *buff, int sz, zproto_cb_t cb, v
 	int i;
 	int err;
 	len_t *total;
-	hdr_t *len;
-	hdr_t *tag;
 	uint8_t *body;
-	int last = st->basetag - 1; //tag now
 	int fcnt = st->fieldnr; //field count
-	int hdrsz= (fcnt + 1) * sizeof(hdr_t) + sizeof(len_t);
-
-	CHECK_OOM(sz, hdrsz);
+	CHECK_OOM(sz, sizeof(len_t));
 	total = (len_t *)buff;
-	len = (hdr_t *)(total + 1);
-	tag = len + 1;
-	buff += hdrsz;
-	sz -= hdrsz;
+	buff = (uint8_t *)(total + 1);
+	sz -= sizeof(len_t);
 	body = buff;
 	for (i = 0; i < fcnt; i++) {
 		struct zproto_field *f;
@@ -729,15 +722,8 @@ zproto_encode(struct zproto_struct *st, uint8_t *buff, int sz, zproto_cb_t cb, v
 		assert(sz >= err);
 		buff += err;
 		sz -= err;
-		assert(f->tag >= last + 1);
-		*tag = (f->tag - last - 1);
-		tag++;
-		last = f->tag;
 	}
-	*len = (tag - len) - 1; //length used one byte
-	if ((uintptr_t)tag != (uintptr_t)body)
-		memmove(tag, body, buff - body);
-	*total = (buff - body) + ((uint8_t *)tag - (uint8_t *)len);
+	*total = (buff - body);
 	return sizeof(len_t) + *total;
 }
 
@@ -830,35 +816,18 @@ zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t
 {
 	int i;
 	int err;
-	int last;
 	len_t total;
-	hdr_t len;
-	hdr_t *tag;
-	int	hdrsz;
-
-	CHECK_VALID(sz, sizeof(hdr_t) + sizeof(len_t))    //header size
-	last = st->basetag - 1; //tag now
+	int fcnt = st->fieldnr; //field count
+	CHECK_VALID(sz, sizeof(len_t))    //header size
 	total = *(len_t *)buff;
 	buff += sizeof(len_t);
 	sz -= sizeof(len_t);
 	CHECK_VALID(sz, total)
 	sz = total;
-	len = *(hdr_t *)buff;
-	buff += sizeof(hdr_t);
-	sz -=  sizeof(hdr_t);
-	hdrsz = len * sizeof(hdr_t);
-	CHECK_VALID(sz, hdrsz)
-	tag = (hdr_t *)buff;
-	buff += hdrsz;
-	sz -= hdrsz;
-
-	for (i = 0; i < len; i++) {
+	for (i = 0; i < fcnt && sz > 0; i++) {
 		struct zproto_field *f;
 		struct zproto_args args;
-		int t = *tag + last + 1;
-		f = queryfield(st, t);
-		if (f == NULL)
-			break;
+		f = st->fieldarray[i];
 		fill_args(&args, f, ud);
 		args.buff = (uint8_t *)buff;
 		args.buffsz = sz;
@@ -871,8 +840,6 @@ zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t
 		assert(err > 0);
 		buff += err;
 		sz -= err;
-		tag++;
-		last = t;
 	}
 	return total + sizeof(len_t);
 }
@@ -1079,7 +1046,7 @@ zproto_create()
 	struct zproto *z = (struct zproto *)malloc(sizeof(*z));
 	memset(z, 0, sizeof(*z));
 	z->now = &z->chunk;
-
+	(void)queryfield;
 	return z;
 }
 

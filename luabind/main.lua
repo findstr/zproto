@@ -21,10 +21,7 @@ packet 0xfe {
 	.info:info[] 2
 	.empty:string[] 8
 	.address:string 13
-	.dummy2:string 18
-	.dummy3:string[] 39
 	.luck:integer[] 45
-	.dummy4:dummy 56
 }
 ]]
 
@@ -49,10 +46,7 @@ packet 0xfe {
 	.info:info[name] 2
 	.empty:string[] 8
 	.address:string 13
-	.dummy2:string 18
-	.dummy3:string[] 39
 	.luck:integer[] 45
-	.dummy4:dummy 56
 	.new:info[name] 57
 }
 ]]
@@ -66,8 +60,8 @@ assert(newproto)
 local packet = {
 	phone = {home=0x12345678abcf, work=654321, negwork = -654321},
 	info = {
-			{name = "lucy", age = 18.3, girl = false, boy = true},
-			{name="lilei", age = 24.5, girl = true, boy = false},
+			{name = "lucy", age = 18.3, girl = false, boy = true, new = {"foo1", "bar1"}},
+			{name="lilei", age = 24.5, girl = true, boy = false, new = {"foo2", "bar2"}},
 		},
 	address = "China.shanghai",
 	luck = {1, -3, 9},

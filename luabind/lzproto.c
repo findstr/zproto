@@ -177,8 +177,9 @@ encode_array(struct zproto_args *args)
 	if (args->idx == 0) {
 		lua_getfield(L, -1, args->name);
 		if (lua_type(L, -1) == LUA_TNIL) {
+			const char *fmt = "encode_table field %s nonexist\n";
 			lua_pop(L, 1);
-			return ZPROTO_NOFIELD;
+			return luaL_error(L, fmt, args->name);
 		}
 		luaL_checktype(L, -1, LUA_TTABLE);
 		lua_pushnil(L);
@@ -211,7 +212,8 @@ encode_table(struct zproto_args *args)
 		lua_getfield(L, -1, args->name);
 		if (lua_type(L, -1) == LUA_TNIL) {
 			lua_pop(L, 1);
-			return ZPROTO_NOFIELD;
+			const char *fmt = "encode_table field %s nonexist\n";
+			return luaL_error(L, fmt, args->name);
 		}
 		sz = encode_field(args);
 		lua_pop(L, 1);
