@@ -64,5 +64,12 @@ namespace zprotobuf
 
 		[DllImport(DLLNAME, EntryPoint = "csdecode", CallingConvention = CallingConvention.Cdecl)]
 		public extern static int decode(System.IntPtr st, System.IntPtr ptr, int len, zproto_cb_t cb, IntPtr obj);
+
+		[DllImport(DLLNAME, EntryPoint = "cspack", CallingConvention = CallingConvention.Cdecl)]
+		public extern static int pack(System.IntPtr src, int srcsz, System.IntPtr dst, int dstsz);
+
+		[DllImport(DLLNAME, EntryPoint = "csunpack", CallingConvention = CallingConvention.Cdecl)]
+		public extern static int unpack(System.IntPtr src, int srcsz, System.IntPtr dst, int dstsz);
+
 	}
 }

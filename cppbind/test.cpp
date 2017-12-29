@@ -35,14 +35,61 @@ print_struct(const hello::world::packet &pk)
 	printf("\n");
 }
 
+template<typename T> static void
+assert_map(T &a, T &b)
+{
+	for (const auto &iter:a) {
+		const auto &biter = b.find(iter.first);
+		assert(biter != b.end());
+		assert(iter.first == biter->first);
+		//assert(iter->second == biter->second);
+	};
+}
+
+template<typename T> void
+assert_vector(T &a, T &b)
+{
+	assert(a.size() == b.size());
+	for (size_t i = 0; i < a.size(); i++)
+		assert(a[i] == b[i]);
+}
+static void
+assert_struct(const hello::world::packet &a, const hello::world::packet &b)
+{
+	for (const auto &iter:b.phone) {
+		const auto &aiter = a.phone.find(iter.second.home);
+		assert(aiter != a.phone.end());
+		assert(iter.second.home == aiter->second.home);
+		assert(iter.second.work - aiter->second.work < 0.0001);
+		assert(iter.second.home == aiter->second.home);
+	};
+	for (const auto &iter:b.phone2) {
+		const auto &aiter = a.phone2.find(iter.second.work);
+		assert(aiter != a.phone2.end());
+		assert(iter.second.home == aiter->second.home);
+		assert(iter.second.work - aiter->second.work < 0.0001);
+		assert(iter.second.home == aiter->second.home);
+	};
+
+	assert(a.address == b.address);
+	assert(a.luck == b.luck);
+	assert_vector(a.address1, b.address1);
+	assert(a.ii == b.ii);
+	assert(a.ff == b.ff);
+	assert(a.bb == b.bb);
+}
+
+
 static hello::world::packet pk;
 
 static void
 test_normal()
 {
 	std::string dat;
+	std::string cook, tmp;
 	const uint8_t *datbuf;
-	int datsize;
+	const uint8_t *cookbuf;
+	int datsize, cooksize;
 	hello::world::packet pk2;
 	hello::world::packet pk3;
 
@@ -50,15 +97,30 @@ test_normal()
 	printf("tag:%x\n", pk._tag());
 	printf("encode1 size:%d\n", sz);
 	print_hex((uint8_t *)dat.c_str(), dat.size());
+	sz = pk._pack((uint8_t *)dat.c_str(), dat.size(), cook);
+	printf("pack1 size:%d\n", sz);
+	print_hex((uint8_t *)cook.c_str(), cook.size());
+
 	datsize = pk._serialize(&datbuf);
-	printf("encode2 size:%d\n", sz);
+	printf("encode2 size:%d\n", datsize);
 	print_hex(datbuf, datsize);
+	cooksize = pk._pack(datbuf, datsize, &cookbuf);
+	printf("pack2 size:%d\n", cooksize);
+	print_hex(cookbuf, cooksize);
+	tmp.assign((char *)cookbuf, cooksize);
+
+	dat.clear();
+	pk2._unpack((uint8_t *)cook.c_str(), cook.size(), dat);
 	sz = pk2._parse(dat);
 	printf("decode1 size:%d\n", sz);
 	print_struct(pk2);
+	assert_struct(pk2, pk);
+
+	datsize = pk3._unpack((uint8_t *)tmp.c_str(), tmp.size(), &datbuf);
 	sz = pk3._parse(datbuf, datsize);
 	printf("decode2 size:%d\n", sz);
 	print_struct(pk3);
+	assert_struct(pk3, pk);
 	pk3._reset();
 	assert(pk3.phone.size() == 0);
 	assert(pk3.address.size() == 0);

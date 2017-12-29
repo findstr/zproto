@@ -110,11 +110,21 @@ namespace zprotobuf
 		public virtual int _serialize(out byte[] dat) {
 			dat = null;
 			Debug.Assert("NotImplement" == null);
-			return 0;
+			return dll.ERROR;
 		}
 		public virtual int _parse(byte[] dat, int size) {
 			Debug.Assert("NotImplement" == null);
-			return 0;
+			return dll.ERROR;
+		}
+		public virtual int _pack(byte[] src, int size, out byte[] dst) {
+			dst = null;
+			Debug.Assert("NotImplement" == null);
+			return dll.ERROR;
+		}
+		public virtual int _unpack(byte[] src, int size, out byte[] dst) {
+			dst = null;
+			Debug.Assert("NotImplement" == null);
+			return dll.ERROR;
 		}
 		public virtual int _tag() {
 			Debug.Assert("NotImplement" == null);
@@ -129,19 +139,15 @@ namespace zprotobuf
 	public class wiretree {
 		private string protodef = "";
 		private IntPtr Z = IntPtr.Zero;
-		private IntPtr buff = IntPtr.Zero;
-		private int bufflen = 0;
+		private int buffsize = 64;
 		private Dictionary<string, IntPtr> cache = new Dictionary<string,IntPtr>();
 		public wiretree(string def) {
-			bufflen = 64;
-			buff = Marshal. AllocHGlobal(bufflen);
 			protodef = def;
 			Z = dll.parse(protodef);
 		}
 		~wiretree() {
-			Marshal.FreeHGlobal(buff);
-		}
 
+		}
 		private IntPtr query(string name) {
 			if (cache.ContainsKey(name))
 				return cache[name];
@@ -155,46 +161,113 @@ namespace zprotobuf
 			return dll.tag(st);
 		}
 
-		private void expand() {
-			bufflen *= 2;
-			IntPtr sz = (IntPtr)bufflen;
-			buff = Marshal.ReAllocHGlobal(buff, sz);
-			return ;
+		private IntPtr expand(IntPtr buf) {
+			buffsize *= 2;
+			return Marshal.ReAllocHGlobal(buf, (IntPtr)buffsize);
 		}
 
-		private int encodecheck(ref wire obj) {
-			int sz;
+		public int encode(wire obj, out byte[] data) {
+			data = null;
 			IntPtr st = query(obj._name());
+			IntPtr buff = Marshal.AllocHGlobal(buffsize);
 			for (;;) {
-				sz = obj._encode(buff, bufflen, st);
-				if (sz == dll.ERROR)
+				int sz = obj._encode(buff, buffsize, st);
+				if (sz == dll.ERROR) {
+					Marshal.FreeHGlobal(buff);
 					return sz;
+				}
 				if (sz == dll.OOM) {
-					expand();
+					buff = expand(buff);
 					continue;
 				}
+				data = new byte[sz];
+				Marshal.Copy(buff, data, 0, sz);
+				Marshal.FreeHGlobal(buff);
 				return sz;
 			}
 		}
-		public int encode(wire obj, out byte[] data) {
-			int sz;
-			data = null;
-			sz = encodecheck(ref obj);
-			if (sz > 0) {
-				data = new byte[sz];
-				Marshal.Copy(buff, data, 0, sz);
-			}
-			return sz;
-		}
 		public int decode(wire obj, byte[] data, int size) {
-			int len = bufflen;
+			int ret;
 			IntPtr st = query(obj._name());
-			while (bufflen < size)
-				bufflen *= 2;
-			if (bufflen != len)
-				buff = Marshal.ReAllocHGlobal(buff, (IntPtr)bufflen);
+			while (buffsize < size)
+				buffsize *= 2;
+			IntPtr buff = Marshal.AllocHGlobal(buffsize);
 			Marshal.Copy(data, 0, buff, size);
-			return obj._decode(buff, size, st);
+			ret = obj._decode(buff, size, st);
+			Marshal.FreeHGlobal(buff);
+			return ret;
+
 		}
+		public int pack(byte[] src, int size, out byte[] dst) {
+			IntPtr srcptr, dstptr;
+			while (buffsize < size)
+				buffsize *= 2;
+			srcptr = Marshal.AllocHGlobal(buffsize);
+			dstptr = Marshal.AllocHGlobal(buffsize);
+			Marshal.Copy(src, 0, srcptr, size);
+			dst = null;
+			for (;;) {
+				int ret = dll.pack(srcptr, size, dstptr, buffsize);
+				if (ret == dll.ERROR) {
+					Marshal.FreeHGlobal(srcptr);
+					Marshal.FreeHGlobal(dstptr);
+					return ret;
+				}
+				if (ret == dll.OOM) {
+					dstptr = expand(dstptr);
+					continue;
+				}
+				dst = new byte[ret];
+				Marshal.Copy(dstptr, dst, 0, ret);
+				Marshal.FreeHGlobal(srcptr);
+				Marshal.FreeHGlobal(dstptr);
+				return ret;
+			}
+		}
+		public int unpack(byte[] src, int size, out byte[] dst) {
+			IntPtr srcptr, dstptr;
+			while (buffsize < size * 2)	//assume compress ratio is 0.5
+				buffsize *= 2;
+			srcptr = Marshal.AllocHGlobal(buffsize);
+			dstptr = Marshal.AllocHGlobal(buffsize);
+			Marshal.Copy(src, 0, srcptr, size);
+			dst = null;
+			for (;;) {
+				int ret = dll.unpack(srcptr, size, dstptr, buffsize);
+				if (ret == dll.ERROR) {
+					Marshal.FreeHGlobal(srcptr);
+					Marshal.FreeHGlobal(dstptr);
+					return ret;
+				}
+				if (ret == dll.OOM) {
+					dstptr = expand(dstptr);
+					continue;
+				}
+				dst = new byte[ret];
+				Marshal.Copy(dstptr, dst, 0, ret);
+				Marshal.FreeHGlobal(srcptr);
+				Marshal.FreeHGlobal(dstptr);
+				return ret;
+			}
+		}
+	}
+
+	public abstract class iwirep:wire {
+		public override int _serialize(out byte[] dat) {
+			return _wiretree().encode(this, out dat);
+		}
+		public override int _parse(byte[] dat, int size) {
+			return _wiretree().decode(this, dat, size);
+		}
+		public override int _pack(byte[] src, int size, out byte[] dst) {
+			return _wiretree().pack(src, size, out dst);
+		}
+		public override int _unpack(byte[] src, int size, out byte[] dst) {
+			return _wiretree().unpack(src, size, out dst);
+		}
+		public override int _tag() {
+			return _wiretree().tag(_name());
+		}
+		protected abstract wiretree _wiretree();
 	}
 }

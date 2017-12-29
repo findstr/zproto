@@ -76,3 +76,16 @@ csdecode(struct zproto_struct *st, uint8_t *data, int len, zproto_cb_t cb,
 	return zproto_decode(st, data, len, cb, obj);
 }
 
+int EXPORT
+cspack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
+{
+	return zproto_pack(src, srcsz, dst, dstsz);
+}
+
+int EXPORT
+csunpack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
+{
+	return zproto_unpack(src, srcsz, dst, dstsz);
+}
+
+

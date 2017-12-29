@@ -187,7 +187,7 @@ local function testcompatible(name, e, d)
 	print(string.format("=========stop test compatible %s =============", name))
 end
 
-local testcount = 512 * 512
+local testcount = 1024 * 1024
 
 local function testpackunpack()
 	print("========begin pack/unpack============")
@@ -199,7 +199,7 @@ local function testpackunpack()
 	local function testmode(n)
 		print(string.format("test mode%d start", n))
 		for i = 1, testcount do
-			local origin = rand.rand(0)
+			local origin = rand.rand(n)
 			local packed = proto:pack(origin)
 			local unpacked = proto:unpack(packed)
 			local cooked = round8(origin)
@@ -215,6 +215,21 @@ local function testpackunpack()
 		end
 		print(string.format("test mode%d stop", n))
 		return true
+	end
+	local function testsize(n)
+		local tbl = {}
+		for i = 1, n do
+			tbl[i] = '0';
+		end
+		local dat = table.concat(tbl)
+		local pack = zproto:pack(dat)
+		local unpack = zproto:unpack(pack)
+		assert(unpack == round8(dat))
+		print("pack", n,  "data:", #pack)
+		return #pack
+	end
+	for i = 1, 8191 do
+		assert(testsize(i) <= i + (i + 2047) // 2048 * 2 + 1)
 	end
 	if not testmode(0) then
 		return

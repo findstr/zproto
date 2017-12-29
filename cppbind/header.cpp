@@ -239,14 +239,9 @@ wiretree(FILE *fp)
 "};\n");
 }
 const char *wirep =
-"struct wirep:public wire {\n"
-"public:\n"
-"        virtual int _serialize(std::string &dat) const;\n"
-"        virtual int _serializesafe(std::string &dat, int presize = 1024) const;\n"
-"        virtual int _serialize(const uint8_t **data) const;\n"
-"        virtual int _parse(const std::string &dat);\n"
-"        virtual int _parse(const uint8_t *data, int datasz);\n"
-"        virtual int _tag() const;\n"
+"struct wirep:public iwirep {\n"
+"private:\n"
+"        virtual wiretree &_wiretree() const;\n"
 "};\n\n";
 
 void

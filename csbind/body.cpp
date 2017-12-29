@@ -416,15 +416,9 @@ wiretree(FILE *fp, const char *proto)
 }
 
 static const char *wirep =
-"public abstract class wirep:wire {\n"
-"\tpublic override int _serialize(out byte[] dat) {\n"
-"\t\treturn serializer.instance().encode(this, out dat);\n"
-"\t}\n"
-"\tpublic override int _parse(byte[] dat, int size) {\n"
-"\t\treturn serializer.instance().decode(this, dat, size);\n"
-"\t}\n"
-"\tpublic override int _tag() {\n"
-"\t\treturn serializer.instance().tag(_name());\n"
+"public abstract class wirep:iwirep {\n"
+"\tprotected override wiretree _wiretree() {\n"
+"\t\treturn serializer.instance();\n"
 "\t}\n"
 "}\n\n";
 

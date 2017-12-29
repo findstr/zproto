@@ -926,13 +926,6 @@ pack(const uint8_t *src, int sn, uint8_t *dst, int dn)
 	int packsz;
 	uint8_t *ffn = NULL;
 	uint8_t *dstart = dst;
-	int needn = ((sn + 2047) / 2048) * 2 + sn;
-	if (sn % 8 != 0)
-		++needn;
-
-	if (needn > dn)
-		return -1;
-
 	packsz = -1;
 	while (sn > 0) {
 		if (packsz != 8) {  //pack segment
@@ -952,7 +945,7 @@ pack(const uint8_t *src, int sn, uint8_t *dst, int dn)
 			*ffn = 0;
 			for (;;) {
 				packsz = packff(src, sn, dst, dn);
-				if (packsz == 6 || packsz == 7 || packsz == 8) {
+				if (packsz >= 6 && packsz <= 8) {//6,7,8
 					src += 8;
 					sn -= 8;
 					dst += packsz;
@@ -1004,7 +997,7 @@ static int
 unpackff(const uint8_t *src, int sn, uint8_t *dst, int dn)
 {
 	if (dn < 8)
-		return -ZPROTO_OOM;
+		return ZPROTO_OOM;
 	sn = sn < 8 ? sn : 8;
 	memcpy(dst, src, sn);
 	memset(&dst[sn], 0, 8 - sn);
@@ -1022,7 +1015,6 @@ unpack(const uint8_t *src, int sn, uint8_t *dst, int dn)
 			unpacksz = unpackseg(src, sn, dst, dn);
 			if (unpacksz < 0)    //not enough storage space
 				return unpacksz;
-
 			src += unpacksz + 1;
 			sn -= unpacksz + 1;
 			dst += 8;
@@ -1056,15 +1048,12 @@ unpack(const uint8_t *src, int sn, uint8_t *dst, int dn)
 int
 zproto_pack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
 {
-	int n;
-	int needn = ((srcsz + 2047) / 2048) * 2 + srcsz;
-	if (srcsz % 8 != 0)
-		++needn;
+	//origin data:0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x9
+	//packed data:0xff,0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x0,0x1,0x9
+	int needn = ((srcsz + 2047) / 2048) * 2 + srcsz + 1;
 	if (dstsz < needn)
 		return ZPROTO_OOM;
-	n = pack(src, srcsz, dst, dstsz);
-	assert(n > 0);
-	return n;
+	return pack(src, srcsz, dst, dstsz);
 }
 
 int
