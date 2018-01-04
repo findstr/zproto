@@ -221,11 +221,11 @@ dumpst(FILE *fp, struct zproto *z, struct zproto_struct *st)
 	struct zproto_struct *nxt = zproto_next(z, st);
 	if (st == NULL)
 		return;
-	dumpst(fp, z, nxt);
 	args.level = 1;
 	args.fields.clear();
 	formatst(st, args);
 	dump_vecstring(fp, args.fields);
+	dumpst(fp, z, nxt);
 }
 
 static void

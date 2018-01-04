@@ -160,10 +160,13 @@ int main()
 	pk.phone[1].home = -3389;
 	pk.phone[1].work = 999.98;
 	pk.phone[1].main = false;
+	pk.phone[1].fooval.bar1 = 9.9f;
+	pk.phone[1].fooval2.bar2 = 8.9f;
 	pk.phone2[999.98].home = -3399;
 	pk.phone2[999.98].work = 999.98;
 	pk.phone2[999.98].main = true;
-
+	pk.phone2[999.98].fooval.bar1 = 9.8f;
+	pk.phone2[999.98].fooval2.bar2 = 8.8f;
 	pk.address = "ShangHai";
 	pk.luck.push_back(3);
 	pk.luck.push_back(7);

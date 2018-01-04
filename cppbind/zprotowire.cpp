@@ -217,38 +217,55 @@ wire::_reset()
 	//empty
 }
 
+class block {
+public:
+	size_t size;
+	uint8_t *ptr;
+public:
+	block() {
+		size = BUFFSZ;
+		ptr = new uint8_t[size];
+	}
+	~block() {
+		delete[] ptr;
+	}
+public:
+	void expand() {
+		size *= 2;
+		delete[] ptr;
+		ptr = new uint8_t[size];
+	}
+};
+
+class buffer {
+private:
+	buffer() {}
+public:
+	~buffer() {}
+	static class buffer& instance() {
+		static buffer *inst = new buffer();
+		return *inst;
+	}
+public:
+	struct block marshal;
+	struct block cook;
+};
+
 //syntax tree
 
 wiretree::wiretree(const char *proto)
 	:protodef(proto)
 {
 	int err;
-	z = zproto_create();
-	err = zproto_parse(z, protodef);
+	struct zproto_parser parser;
+	err = zproto_parse(&parser, protodef);
 	assert(err == 0);
-	marshal.ptr = new uint8_t[BUFFSZ];
-	marshal.size = BUFFSZ;
-	cook.ptr = new uint8_t[BUFFSZ];
-	cook.size = BUFFSZ;
+	z = parser.z;
 }
 
 wiretree::~wiretree()
 {
 	zproto_free(z);
-	delete[] marshal.ptr;
-	delete[] cook.ptr;
-}
-
-
-void
-wiretree::expand(struct wiretree::buffer *buff)
-{
-	size_t newsz = buff->size * 2;
-	uint8_t *newbuff = new uint8_t[newsz];
-	delete[] buff->ptr;
-	buff->size = newsz;
-	buff->ptr = newbuff;
-	return ;
 }
 
 struct zproto_struct *
@@ -270,12 +287,13 @@ wiretree::encodecheck(const wire &w)
 {
 	int sz;
 	struct zproto_struct *st = query(w._name());
+	auto &marshal = buffer::instance().marshal;
 	for (;;) {
 		sz = w._encode(marshal.ptr, marshal.size, st);
 		if (sz == ZPROTO_ERROR)
 			return sz;
 		if (sz == ZPROTO_OOM) {
-			expand(&marshal);
+			marshal.expand();
 			continue;
 		}
 		return sz;
@@ -287,12 +305,13 @@ wiretree::encodecheck(const wire &w)
 int
 wiretree::cookcheck(const uint8_t *src, int size, cook_cb_t cb)
 {
+	auto &cook = buffer::instance().cook;
 	for (;;) {
 		int sz = cb(src, size, cook.ptr, cook.size);
 		if (sz == ZPROTO_ERROR)
 			return sz;
 		if (sz == ZPROTO_OOM) {
-			expand(&cook);
+			cook.expand();
 			continue;
 		}
 		return sz;
@@ -337,7 +356,7 @@ wiretree::encode(const wire &w, std::string &dat)
 	dat.clear();
 	sz = encodecheck(w);
 	if (sz > 0)
-		dat.assign((char *)marshal.ptr, sz);
+		dat.assign((char *)buffer::instance().marshal.ptr, sz);
 	return sz;
 }
 
@@ -347,7 +366,7 @@ wiretree::encode(const wire &w, const uint8_t **dat)
 	int sz;
 	sz = encodecheck(w);
 	if ((sz >= 0) && dat)
-		*dat = marshal.ptr;
+		*dat = buffer::instance().marshal.ptr;
 	return sz;
 }
 
@@ -357,7 +376,7 @@ wiretree::pack(const uint8_t *src, int size, std::string &dat)
 	int sz;
 	sz = cookcheck(src, size, zproto_pack);
 	if (sz > 0)
-		dat.assign((char *)cook.ptr, sz);
+		dat.assign((char *)buffer::instance().cook.ptr, sz);
 	return sz;
 }
 
@@ -367,7 +386,7 @@ wiretree::pack(const uint8_t *src, int size, const uint8_t **dat)
 	int sz;
 	sz = cookcheck(src, size, zproto_pack);
 	if ((sz >= 0) && dat)
-		*dat = cook.ptr;
+		*dat = buffer::instance().cook.ptr;
 	return sz;
 }
 
@@ -377,7 +396,7 @@ wiretree::unpack(const uint8_t *src, int size, std::string &dat)
 	int sz;
 	sz = cookcheck(src, size, zproto_unpack);
 	if (sz > 0)
-		dat.assign((char *)cook.ptr, sz);
+		dat.assign((char *)buffer::instance().cook.ptr, sz);
 	return sz;
 }
 
@@ -387,7 +406,7 @@ wiretree::unpack(const uint8_t *src, int size, const uint8_t **dat)
 	int sz;
 	sz = cookcheck(src, size, zproto_unpack);
 	if ((sz >= 0) && dat)
-		*dat = cook.ptr;
+		*dat = buffer::instance().cook.ptr;
 	return sz;
 }
 

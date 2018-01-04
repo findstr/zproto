@@ -1,14 +1,28 @@
+foo 0xfc {
+	.bar:integer 1
+}
+
+foo2 0xfd {
+	.bar2:float 1
+}
+
 packet 0xfe {
 	#english comment
+	foo {
+		.bar1:float 1
+	}
 	phone {
-		.home:long 1
-		.work:integer 2
+		.home:integer 1
+		.work:float 2
+		.main:boolean 3
+		.fooval:foo 5
 	}
 	#中文注释
 	.phoneval:phone[] 1
-	.address:string 3
-	.luck:long[] 4
-	.address1:string[] 5
+	.address:string 2
+	.luck:long[] 3
+	.address1:string[] 4
+	.fooval:foo2 5
 }
 
 

@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace zprotobuf
 {
-	public class dll
+	public class zdll
 	{
 		private const string DLLNAME = "zproto";
 		public const int OOM = -1;
@@ -41,34 +41,34 @@ namespace zprotobuf
 
 		public delegate int zproto_cb_t(ref args arg);
 
-		[DllImport(DLLNAME, EntryPoint = "csload", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszload", CallingConvention = CallingConvention.Cdecl)]
 		public extern static System.IntPtr load(string name);
 
-		[DllImport(DLLNAME, EntryPoint = "csparse", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszparse", CallingConvention = CallingConvention.Cdecl)]
 		public extern static System.IntPtr parse(string content);
 
-		[DllImport(DLLNAME, EntryPoint = "csfree", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszfree", CallingConvention = CallingConvention.Cdecl)]
 		public extern static void free(System.IntPtr z);
 
-		[DllImport(DLLNAME, EntryPoint = "csquery", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszquery", CallingConvention = CallingConvention.Cdecl)]
 		public extern static System.IntPtr query(System.IntPtr z, string name);
 
-		[DllImport(DLLNAME, EntryPoint = "cstag", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "csztag", CallingConvention = CallingConvention.Cdecl)]
 		public extern static int tag(System.IntPtr st);
 
-		[DllImport(DLLNAME, EntryPoint = "csquerytag", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszquerytag", CallingConvention = CallingConvention.Cdecl)]
 		public extern static System.IntPtr querytag(System.IntPtr z, int tag);
 
-		[DllImport(DLLNAME, EntryPoint = "csencode", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszencode", CallingConvention = CallingConvention.Cdecl)]
 		public extern static int encode(System.IntPtr st, System.IntPtr ptr, int len, zproto_cb_t cb, IntPtr obj);
 
-		[DllImport(DLLNAME, EntryPoint = "csdecode", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszdecode", CallingConvention = CallingConvention.Cdecl)]
 		public extern static int decode(System.IntPtr st, System.IntPtr ptr, int len, zproto_cb_t cb, IntPtr obj);
 
-		[DllImport(DLLNAME, EntryPoint = "cspack", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszpack", CallingConvention = CallingConvention.Cdecl)]
 		public extern static int pack(System.IntPtr src, int srcsz, System.IntPtr dst, int dstsz);
 
-		[DllImport(DLLNAME, EntryPoint = "csunpack", CallingConvention = CallingConvention.Cdecl)]
+		[DllImport(DLLNAME, EntryPoint = "cszunpack", CallingConvention = CallingConvention.Cdecl)]
 		public extern static int unpack(System.IntPtr src, int srcsz, System.IntPtr dst, int dstsz);
 
 	}

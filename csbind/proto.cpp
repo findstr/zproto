@@ -56,9 +56,9 @@ int main(int argc, char *argv[])
 	char *proto;
 	char *space_buf;
 	std::string name;
-	std::vector<const char *>space;
-	struct zproto *z;
 	struct stat st;
+	struct zproto_parser parser;
+	std::vector<const char *>space;
 	if (argc < 2) {
 		printf("USAGE:%s [*.zproto]\n", argv[0]);
 		return 0;
@@ -81,20 +81,19 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	proto[st.st_size] = 0;
-	z = zproto_create();
-	err = zproto_parse(z, proto);
+	err = zproto_parse(&parser, proto);
 	if (err < 0) {
+		fprintf(stderr, parser.error);
 		delete proto;
-		zproto_free(z);
 		return -1;
 	}
 	strip_ext(argv[1]);
 	space_buf = strdup(argv[1]);
 	name_space(space_buf, space);
 	name = remove_dot(argv[1]);
-	body(name.c_str(), space, proto, z);
+	body(name.c_str(), space, proto, parser.z);
 	delete []proto;
-	zproto_free(z);
+	zproto_free(parser.z);
 	return 0;
 }
 

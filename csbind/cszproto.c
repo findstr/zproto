@@ -10,80 +10,67 @@
 #endif
 
 struct zproto * EXPORT
-csload(const char *file)
+cszload(const char *file)
 {
 	printf("helloworld:%s\n", file);
 	return NULL;
 }
 
 struct zproto * EXPORT
-csparse(const char *content)
+cszparse(const char *content)
 {
-	int err = 0;
-	char *buff;
-	struct zproto *z;
-	size_t len = strlen(content);
-
-	z = zproto_create();
-	buff = malloc(len + 1);
-	memcpy(buff, content, len);
-	buff[len] = 0;
-	err = zproto_parse(z, buff);
-	free(buff);
-	if (err < 0) {
-		zproto_free(z);
-		z = NULL;
-	}
-	return z;
+	struct zproto_parser parser;
+	zproto_parse(&parser, content);
+	return parser.z;
 }
 
 void EXPORT
-csfree(struct zproto *z)
+cszfree(struct zproto *z)
 {
 	zproto_free(z);
 	return ;
 }
 
 struct zproto_struct * EXPORT
-csquery(struct zproto *z, const char *name)
+cszquery(struct zproto *z, const char *name)
 {
 	return zproto_query(z, name);
 }
 
 int EXPORT
-cstag(struct zproto_struct *st)
+csztag(struct zproto_struct *st)
 {
 	return zproto_tag(st);
 }
 
 struct zproto_struct * EXPORT
-csquerytag(struct zproto *z, int tag)
+cszquerytag(struct zproto *z, int tag)
 {
 	return zproto_querytag(z, tag);
 }
 
 int EXPORT
-csencode(struct zproto_struct *st, uint8_t *data, int len, zproto_cb_t cb,
+cszencode(struct zproto_struct *st, uint8_t *data, int len, zproto_cb_t cb,
 		void *obj)
 {
 	return zproto_encode(st, data, len, cb, obj);
 }
 
 int EXPORT
-csdecode(struct zproto_struct *st, uint8_t *data, int len, zproto_cb_t cb,
+cszdecode(struct zproto_struct *st, uint8_t *data, int len, zproto_cb_t cb,
 		void *obj)
 {
 	return zproto_decode(st, data, len, cb, obj);
 }
 
 int EXPORT
-cspack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
+cszpack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
 {
 	return zproto_pack(src, srcsz, dst, dstsz);
 }
 
 int EXPORT
-csunpack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
+cszunpack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
 {
 	return zproto_unpack(src, srcsz, dst, dstsz);
 }

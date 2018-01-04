@@ -9,12 +9,12 @@ namespace zprotobuf
 	public abstract class wire {
 		private static int oid = 0;
 		private static Dictionary<IntPtr, wire> uds = new Dictionary<IntPtr, wire>();
-		private static int encode_cb(ref dll.args arg) {
+		private static int encode_cb(ref zdll.args arg) {
 			wire obj = uds[arg.ud];
 			return obj._encode_field(ref arg);
 		}
 
-		private static int decode_cb(ref dll.args arg) {
+		private static int decode_cb(ref zdll.args arg) {
 			wire obj = uds[arg.ud];
 			return obj._decode_field(ref arg);
 		}
@@ -28,81 +28,81 @@ namespace zprotobuf
 			uds[id] = null;
 		}
 
-		protected int write(ref dll.args arg, byte[] src) {
+		protected int write(ref zdll.args arg, byte[] src) {
 			if (src.Length > arg.buffsz)
-				return dll.OOM;
+				return zdll.OOM;
 			Marshal.Copy(src, 0, arg.buff, src.Length);
 			return src.Length;
 		}
 
-		protected int write(ref dll.args arg, bool val) {
+		protected int write(ref zdll.args arg, bool val) {
 			byte[] src = BitConverter.GetBytes(val);
  			return write(ref arg, src);
 		}
 
-		protected int write(ref dll.args arg, int val) {
+		protected int write(ref zdll.args arg, int val) {
 			byte[] src = BitConverter.GetBytes(val);
 			return write(ref arg, src);
 		}
 
-		protected int write(ref dll.args arg, long val) {
+		protected int write(ref zdll.args arg, long val) {
 			byte[] src = BitConverter.GetBytes(val);
 			return write(ref arg, src);
 		}
 
-		protected int write(ref dll.args arg, float val) {
+		protected int write(ref zdll.args arg, float val) {
 			byte[] src = BitConverter.GetBytes(val);
 			return write(ref arg, src);
 		}
 
-		private byte[] read(ref dll.args arg) {
+		private byte[] read(ref zdll.args arg) {
 			byte[] ret = new byte[arg.buffsz];
 			Marshal.Copy(arg.buff, ret, 0, ret.Length);
 			return ret;
 		}
-		protected int read(ref dll.args arg, out bool val) {
+		protected int read(ref zdll.args arg, out bool val) {
 			val = false;
 			if (arg.buffsz < 1)
-				return dll.ERROR;
+				return zdll.ERROR;
 			val = BitConverter.ToBoolean(read(ref arg), 0);
 			return arg.buffsz;
 		}
-		protected int read(ref dll.args arg, out int val) {
+		protected int read(ref zdll.args arg, out int val) {
 			val = 0;
 			if (arg.buffsz < sizeof(int))
-				return dll.ERROR;
+				return zdll.ERROR;
 			val = BitConverter.ToInt32(read(ref arg), 0);
 			return arg.buffsz;
 		}
-		protected int read(ref dll.args arg, out long val) {
+		protected int read(ref zdll.args arg, out long val) {
 			val = 0;
 			if (arg.buffsz < sizeof(long))
-				return dll.ERROR;
+				return zdll.ERROR;
 			val = BitConverter.ToInt64(read(ref arg), 0);
 			return arg.buffsz;
 		}
-		protected int read(ref dll.args arg, out float val) {
+		protected int read(ref zdll.args arg, out float val) {
 			val = 0.0f;
 			if (arg.buffsz < sizeof(float))
-				return dll.ERROR;
+				return zdll.ERROR;
 			val = BitConverter.ToSingle(read(ref arg), 0);
 			return arg.buffsz;
 		}
-		protected int read(ref dll.args arg, out byte[] val) {
+		protected int read(ref zdll.args arg, out byte[] val) {
 			val = read(ref arg);
 			return arg.buffsz;
 		}
 
 		public int _encode(IntPtr buff, int len, IntPtr st) {
 			IntPtr id = udbegin();
-			int err = dll.encode(st, buff, len, encode_cb, id);
+			int err = zdll.encode(st, buff, len, encode_cb, id);
 			udend(id);
 			return err;
 		}
 
 		public int _decode(IntPtr buff, int len, IntPtr st) {
 			IntPtr id = udbegin();
-			int err = dll.decode(st, buff, len, decode_cb, id);
+			int err = zdll.decode(st, buff, len, decode_cb, id);
 			udend(id);
 			return err;
 		}
@@ -110,21 +110,25 @@ namespace zprotobuf
 		public virtual int _serialize(out byte[] dat) {
 			dat = null;
 			Debug.Assert("NotImplement" == null);
-			return dll.ERROR;
+			return zdll.ERROR;
 		}
 		public virtual int _parse(byte[] dat, int size) {
 			Debug.Assert("NotImplement" == null);
-			return dll.ERROR;
+			return zdll.ERROR;
+		}
+		public virtual int _parse(IntPtr dat, int size) {
+			Debug.Assert("NotImplement" == null);
+			return zdll.ERROR;
 		}
 		public virtual int _pack(byte[] src, int size, out byte[] dst) {
 			dst = null;
 			Debug.Assert("NotImplement" == null);
-			return dll.ERROR;
+			return zdll.ERROR;
 		}
 		public virtual int _unpack(byte[] src, int size, out byte[] dst) {
 			dst = null;
 			Debug.Assert("NotImplement" == null);
-			return dll.ERROR;
+			return zdll.ERROR;
 		}
 		public virtual int _tag() {
 			Debug.Assert("NotImplement" == null);
@@ -132,8 +136,8 @@ namespace zprotobuf
 		}
 		//abstract function
 		public abstract string _name();
-		protected abstract int _encode_field(ref dll.args arg);
-		protected abstract int _decode_field(ref dll.args arg);
+		protected abstract int _encode_field(ref zdll.args arg);
+		protected abstract int _decode_field(ref zdll.args arg);
 	}
 
 	public class wiretree {
@@ -143,7 +147,7 @@ namespace zprotobuf
 		private Dictionary<string, IntPtr> cache = new Dictionary<string,IntPtr>();
 		public wiretree(string def) {
 			protodef = def;
-			Z = dll.parse(protodef);
+			Z = zdll.parse(protodef);
 		}
 		~wiretree() {
 
@@ -151,14 +155,14 @@ namespace zprotobuf
 		private IntPtr query(string name) {
 			if (cache.ContainsKey(name))
 				return cache[name];
-			IntPtr st = dll.query(Z, name);
+			IntPtr st = zdll.query(Z, name);
 			cache[name] = st;
 			return st;
 		}
 
 		public int tag(string name) {
 			IntPtr st = query(name);
-			return dll.tag(st);
+			return zdll.tag(st);
 		}
 
 		private IntPtr expand(IntPtr buf) {
@@ -172,11 +176,11 @@ namespace zprotobuf
 			IntPtr buff = Marshal.AllocHGlobal(buffsize);
 			for (;;) {
 				int sz = obj._encode(buff, buffsize, st);
-				if (sz == dll.ERROR) {
+				if (sz == zdll.ERROR) {
 					Marshal.FreeHGlobal(buff);
 					return sz;
 				}
-				if (sz == dll.OOM) {
+				if (sz == zdll.OOM) {
 					buff = expand(buff);
 					continue;
 				}
@@ -196,7 +200,10 @@ namespace zprotobuf
 			ret = obj._decode(buff, size, st);
 			Marshal.FreeHGlobal(buff);
 			return ret;
-
+		}
+		public int decode(wire obj, IntPtr data, int size) {
+			IntPtr st = query(obj._name());
+			return obj._decode(data, size, st);
 		}
 		public int pack(byte[] src, int size, out byte[] dst) {
 			IntPtr srcptr, dstptr;
@@ -207,13 +214,13 @@ namespace zprotobuf
 			Marshal.Copy(src, 0, srcptr, size);
 			dst = null;
 			for (;;) {
-				int ret = dll.pack(srcptr, size, dstptr, buffsize);
-				if (ret == dll.ERROR) {
+				int ret = zdll.pack(srcptr, size, dstptr, buffsize);
+				if (ret == zdll.ERROR) {
 					Marshal.FreeHGlobal(srcptr);
 					Marshal.FreeHGlobal(dstptr);
 					return ret;
 				}
-				if (ret == dll.OOM) {
+				if (ret == zdll.OOM) {
 					dstptr = expand(dstptr);
 					continue;
 				}
@@ -233,13 +240,13 @@ namespace zprotobuf
 			Marshal.Copy(src, 0, srcptr, size);
 			dst = null;
 			for (;;) {
-				int ret = dll.unpack(srcptr, size, dstptr, buffsize);
-				if (ret == dll.ERROR) {
+				int ret = zdll.unpack(srcptr, size, dstptr, buffsize);
+				if (ret == zdll.ERROR) {
 					Marshal.FreeHGlobal(srcptr);
 					Marshal.FreeHGlobal(dstptr);
 					return ret;
 				}
-				if (ret == dll.OOM) {
+				if (ret == zdll.OOM) {
 					dstptr = expand(dstptr);
 					continue;
 				}
@@ -257,6 +264,9 @@ namespace zprotobuf
 			return _wiretree().encode(this, out dat);
 		}
 		public override int _parse(byte[] dat, int size) {
+			return _wiretree().decode(this, dat, size);
+		}
+		public override int _parse(IntPtr dat, int size) {
 			return _wiretree().decode(this, dat, size);
 		}
 		public override int _pack(byte[] src, int size, out byte[] dst) {

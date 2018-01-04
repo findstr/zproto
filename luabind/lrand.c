@@ -76,7 +76,7 @@ rand1(lua_State *L)
 	while (max == 0)
 		max = rand() % MAX;
 	char buff[max];
-	memset(buff, max, 0);
+	memset(buff, 0, max);
 	lua_pushlstring(L, buff, max);
 	return 1;
 }
@@ -100,13 +100,19 @@ lrand(lua_State *L)
 int
 luaopen_rand(lua_State *L)
 {
+	int i;
 	luaL_Reg tbl[] = {
 		{"rand", lrand},
 		{NULL, NULL},
 	};
 	srand(time(NULL));
-	luaL_checkversion(L);
-	luaL_newlib(L, tbl);
+	lua_createtable(L, 0, 1);
+	i = 0;
+	while (tbl[i].name) {
+		lua_pushcfunction(L, tbl[i].func);
+		lua_setfield(L, -2, tbl[i].name);
+		i++;
+	}
 	return 1;
 }
 

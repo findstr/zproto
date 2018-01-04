@@ -66,11 +66,6 @@ public:
 	int decode(wire &w, const uint8_t *dat, size_t datasz);
 	int tag(const wire &w);
 private:
-	struct buffer {
-		int size;
-		uint8_t *ptr;
-	};
-	void expand(struct buffer *buff);
 	int encodecheck(const wire &w);
 	typedef int (*cook_cb_t)(const uint8_t *src, int srcsz,
 			uint8_t *dst, int dstsz);
@@ -82,8 +77,6 @@ private:
 	const char *protodef;
 	struct zproto *z;
 	std::unordered_map<intptr_t, struct zproto_struct *> cache;
-	struct buffer marshal;
-	struct buffer cook;
 };
 
 class iwirep : public wire {

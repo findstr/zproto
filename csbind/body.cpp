@@ -40,7 +40,7 @@ fill_normal(struct zproto_args *args, int level)
 	"%s\t\tDebug.Assert(args.idx >= 0);\n"
 	"%s\t\tif (args.idx >= (int)%s.Length) {\n"
 	"%s\t\t\targs.len = args.idx;\n"
-	"%s\t\t\treturn dll.NOFIELD;\n"
+	"%s\t\t\treturn zdll.NOFIELD;\n"
 	"%s\t\t}\n"
 	"%s\t\treturn write(ref args, %s[args.idx]);\n";
 	if (args->idx >= 0) {
@@ -136,7 +136,7 @@ fill_struct(struct zproto_args *args, int level)
 	"%s\tcase %d:\n"
 	"%s\t\tif (args.idx >= (int)%s.Length) {\n"
 	"%s\t\t\targs.len = args.idx;\n"
-	"%s\t\t\treturn dll.NOFIELD;\n"
+	"%s\t\t\treturn zdll.NOFIELD;\n"
 	"%s\t\t}\n"
 	"%s\t\treturn %s[args.idx]._encode(args.buff, args.buffsz, args.sttype);\n";
 
@@ -210,7 +210,7 @@ static std::string inline
 format_code(const char *base, const char *name, const char *qualifier, int lv)
 {
 	static const char *fmt =
-	"%sprotected override int %s(ref dll.args args) %s {\n"
+	"%sprotected override int %s(ref zdll.args args) %s {\n"
 	"%s\tswitch (args.tag) {\n";
 	char buff[1024];
 	std::string t = tab(lv);
@@ -224,7 +224,7 @@ format_close(int level)
 {
 	static const char *fmt =
 	"%s\tdefault:\n"
-	"%s\t\treturn dll.ERROR;\n"
+	"%s\t\treturn zdll.ERROR;\n"
 	"%s\t}\n"
 	"%s}\n";
 	char buff[4096];
@@ -381,11 +381,11 @@ dumpst(FILE *fp, struct zproto *z, struct zproto_struct *st)
 	struct zproto_struct *nxt = zproto_next(z, st);
 	if (st == NULL)
 		return;
-	dumpst(fp, z, nxt);
 	args.base = zproto_name(st);
 	args.level = 1;
 	formatst(st, args);
 	dump_vecstring(fp, args.stmts);
+	dumpst(fp, z, nxt);
 	return ;
 }
 

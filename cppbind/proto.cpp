@@ -56,21 +56,19 @@ int main(int argc, char *argv[])
 	FILE *fp;
 	char *proto;
 	char *space_buf;
-	std::vector<const char *>space;
 	std::string name;
-	struct zproto *z;
 	struct stat st;
+	struct zproto_parser parser;
+	std::vector<const char *>space;
 	if (argc < 2) {
 		printf("USAGE:%s [*.zproto]\n", argv[0]);
 		return 0;
 	}
-
 	err = stat(argv[1], &st);
 	if (err < 0) {
 		perror("file noexist");
 		return 0;
 	}
-
 	//read files
 	proto = new char[st.st_size + 1];
 	fp = fopen(argv[1], "rb");
@@ -82,23 +80,21 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	proto[st.st_size] = 0;
-
-	z = zproto_create();
-	err = zproto_parse(z, proto);
+	err = zproto_parse(&parser, proto);
 	if (err < 0) {
+		fprintf(stderr, parser.error);
 		delete proto;
-		zproto_free(z);
 		return -1;
 	}
 	strip_ext(argv[1]);
 	space_buf = strdup(argv[1]);
 	name = remove_dot(argv[1]);
 	name_space(space_buf, space);
-	header(name.c_str(), space, z);
-	body(name.c_str(), space, proto, z);
+	header(name.c_str(), space, parser.z);
+	body(name.c_str(), space, proto, parser.z);
 	free(space_buf);
 	delete []proto;
-	zproto_free(z);
+	zproto_free(parser.z);
 	return 0;
 }
 

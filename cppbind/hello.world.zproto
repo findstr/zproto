@@ -1,9 +1,20 @@
+foo 0xf1 {
+	.bar:float 1
+}
+foo2 0xf3 {
+	.bar2:float 1
+}
 packet 0xfe {
 	#english comment
+	foo {
+		.bar1:float 1
+	}
 	phone {
 		.home:integer 1
 		.work:float 2
 		.main:boolean 3
+		.fooval:foo 5
+		.fooval2:foo2 6
 	}
 	#中文注释
 	.phone:phone[home] 1

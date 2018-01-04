@@ -2,6 +2,7 @@
 #define _ZPROTO_H
 
 #include <stdint.h>
+#include <setjmp.h>
 
 #define ZPROTO_BOOLEAN (1)
 #define ZPROTO_INTEGER (2)
@@ -16,6 +17,11 @@
 
 struct zproto;
 struct zproto_struct;
+
+struct zproto_parser {
+	char error[256];
+	struct zproto *z;
+};
 
 //ENCODE: if 'len' is -1, the array nonexist
 //	otherwise 'len' is length of array
@@ -37,11 +43,9 @@ struct zproto_args {
 
 typedef int (*zproto_cb_t)(struct zproto_args *args);
 
-struct zproto *zproto_create();
+int zproto_load(struct zproto_parser *p, const char *path);
+int zproto_parse(struct zproto_parser *p, const char *data);
 void zproto_free(struct zproto *z);
-
-int zproto_load(struct zproto *z, const char *path);
-int zproto_parse(struct zproto *z, const char *data);
 
 struct zproto_struct *zproto_query(struct zproto *z, const char *name);
 struct zproto_struct *zproto_querytag(struct zproto *z, int tag);

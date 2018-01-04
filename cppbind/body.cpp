@@ -334,10 +334,10 @@ dumpst(FILE *fp, struct zproto *z, struct zproto_struct *st)
 	struct zproto_struct *nxt = zproto_next(z, st);
 	if (st == NULL)
 		return;
-	dumpst(fp, z, nxt);
 	args.base = zproto_name(st);
 	formatst(st, args);
 	dump_vecstring(fp, args.stmts);
+	dumpst(fp, z, nxt);
 	return ;
 }
 

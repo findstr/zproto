@@ -26,5 +26,6 @@ clean:
 	-rm *.o
 	-rm *.cc
 	-rm *.hpp
+	-rm *.a
 
 

@@ -17,11 +17,15 @@ namespace test
 		packet res = new packet();
 		obj.phoneval = new packet.phone[1];
 		obj.phoneval[0] = new packet.phone();
+		obj.phoneval[0].fooval = new packet.phone.foo();
+		obj.phoneval[0].fooval.bar1 = 3.99f;
 		obj.address = enc.GetBytes("hello");
 		obj.luck = new long[1];
 		obj.luck[0] = 1122334455;
 		obj.address1 = new byte[1][];
 		obj.address1[0] = enc.GetBytes("world");
+		obj.fooval = new foo2();
+		obj.fooval.bar2 = 3.3f;
 		obj._serialize(out data);
 		Console.WriteLine("encode: {0}", BitConverter.ToString(data));
 		obj._pack(data, data.Length, out pack);
