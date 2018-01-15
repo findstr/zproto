@@ -43,6 +43,7 @@ struct zproto_struct {
 	int fieldcount;
 	const char *name;
 	struct zproto_struct *next;
+	struct zproto_struct *child;
 	struct zproto_field **fields;
 };
 
@@ -556,6 +557,7 @@ record(struct lexstate *l, struct structnode *parent, int protocol)
 	memset(newst, 0, sizeof(*newst));
 	newst->name = memory_dupstr(&l->mem, name);
 	newst->tag = tag;
+	newst->child = node.child;
 	assert(l->buf.count == 0);
 	l->maxtag = 0;
 	while (ahead == '.') {
@@ -680,6 +682,15 @@ zproto_next(struct zproto *z, struct zproto_struct *st)
 	else
 		st = st->next;
 	return st;
+}
+
+struct zproto_struct *
+zproto_child(struct zproto *z, struct zproto_struct *st)
+{
+	if (st == NULL)
+		return z->root;
+	else
+		return st->child;
 }
 
 static inline void

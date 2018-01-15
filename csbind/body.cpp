@@ -250,14 +250,24 @@ format_name(const char *base, int level)
 static int prototype_cb(struct zproto_args *args);
 
 static void
-formatst(struct zproto_struct *st, struct stmt_args &newargs)
+formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 {
 	int level = newargs.level;
 	std::string t1 = tab(newargs.level - 1);
 	std::string t2 = tab(newargs.level);
 	std::string tmp;
 	char buff[4096];
-
+	struct zproto_struct *child;
+	for (child = zproto_child(z, st); child; child = zproto_next(z, child)) {
+		struct stmt_args nnewargs;
+		nnewargs.level = newargs.level + 1;
+		assert(protocol.count(child) == 0);
+		assert(defined.count(child) == 0);
+		formatst(z, child, nnewargs);
+		newargs.stmts.insert(newargs.stmts.end(),
+			nnewargs.stmts.begin(),
+			nnewargs.stmts.end());
+	}
 	zproto_travel(st, prototype_cb, &newargs);
 
 	//open
@@ -320,12 +330,6 @@ prototype_cb(struct zproto_args *args)
 
 	switch (args->type) {
 	case ZPROTO_STRUCT:
-		if (protocol.count(args->sttype) == 0 && defined.count(args->sttype) == 0) { //protocol define
-			formatst(args->sttype, newargs);
-			ud->stmts.insert(ud->stmts.begin(),
-				newargs.stmts.begin(),
-				newargs.stmts.end());
-		}
 		subtype = zproto_name(args->sttype);
 		estm = fill_struct(args, ud->level);
 		dstm = to_struct(args, subtype.c_str(), ud->level);
@@ -383,7 +387,7 @@ dumpst(FILE *fp, struct zproto *z, struct zproto_struct *st)
 		return;
 	args.base = zproto_name(st);
 	args.level = 1;
-	formatst(st, args);
+	formatst(z, st, args);
 	dump_vecstring(fp, args.stmts);
 	dumpst(fp, z, nxt);
 	return ;

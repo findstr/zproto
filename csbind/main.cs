@@ -17,7 +17,7 @@ namespace test
 		packet res = new packet();
 		obj.phoneval = new packet.phone[1];
 		obj.phoneval[0] = new packet.phone();
-		obj.phoneval[0].fooval = new packet.phone.foo();
+		obj.phoneval[0].fooval = new packet.foo();
 		obj.phoneval[0].fooval.bar1 = 3.99f;
 		obj.address = enc.GetBytes("hello");
 		obj.luck = new long[1];

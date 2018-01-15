@@ -43,14 +43,22 @@ tab(int level)
 static int prototype_cb(struct zproto_args *args);
 
 static void
-formatst(struct zproto_struct *st, struct prototype_args &newargs)
+formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newargs)
 {
 	std::string t1 = tab(newargs.level);
 	std::string t2 = tab(newargs.level - 1);
 	std::string iterwrapper;
 	std::string iterdefine;
 	char buff[2048];
-
+	struct zproto_struct *child;
+	for (child = zproto_child(z, st); child; child = zproto_next(z, child)) {
+		assert(protocol.count(child) == 0);
+		assert(defined.count(child) == 0);
+		struct prototype_args nnewargs;
+		nnewargs.level = newargs.level + 1;
+		formatst(z, child, nnewargs);
+		newargs.type.insert(newargs.type.end(), nnewargs.fields.begin(), nnewargs.fields.end());
+	}
 	zproto_travel(st, prototype_cb, &newargs);
 	//subtype
 	newargs.fields.insert(
@@ -136,7 +144,6 @@ static int
 prototype_cb(struct zproto_args *args)
 {
 	struct prototype_args *ud = (struct prototype_args *)args->ud;
-	struct prototype_args newargs;
 	char buff[2048];
 	std::string type;
 	std::string iter;
@@ -172,11 +179,6 @@ prototype_cb(struct zproto_args *args)
 
 	switch (args->type) {
 	case ZPROTO_STRUCT:
-		if (protocol.count(args->sttype) == 0 && defined.count(args->sttype) == 0) { //protocol define
-			newargs.level = ud->level + 1;
-			formatst(args->sttype, newargs);
-			ud->type.insert(ud->type.end(), newargs.fields.begin(), newargs.fields.end());
-		}
 		subtype = std::string("struct ") + zproto_name(args->sttype);
 		break;
 	case ZPROTO_STRING:
@@ -223,7 +225,7 @@ dumpst(FILE *fp, struct zproto *z, struct zproto_struct *st)
 		return;
 	args.level = 1;
 	args.fields.clear();
-	formatst(st, args);
+	formatst(z, st, args);
 	dump_vecstring(fp, args.fields);
 	dumpst(fp, z, nxt);
 }
