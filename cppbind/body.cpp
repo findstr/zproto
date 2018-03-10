@@ -7,7 +7,7 @@
 
 static std::unordered_set<struct zproto_struct *>	protocol;
 static std::unordered_set<struct zproto_struct *>	defined;
-
+static std::vector<std::string> querystmts;
 struct stmt_args {
 	std::string base;
 	std::vector<std::string> encodestm;
@@ -190,7 +190,7 @@ reset_struct(struct zproto_args *args)
 static std::string inline
 format_code(const char *base, const char *name, const char *qualifier)
 {
-	static const char *fmt =
+	const char *fmt =
 	"int\n"
 	"%s::%s(struct zproto_args *args) %s\n"
 	"{\n"
@@ -204,7 +204,7 @@ format_code(const char *base, const char *name, const char *qualifier)
 static std::string inline
 format_close()
 {
-	static const char *fmt =
+	const char *fmt =
 	"\tdefault:\n"
 	"\t\treturn ZPROTO_ERROR;\n"
 	"\t}\n"
@@ -215,7 +215,7 @@ format_close()
 static std::string inline
 format_reset(const char *base)
 {
-	static const char *fmt =
+	const char *fmt =
 	"void\n"
 	"%s::_reset()\n"
 	"{\n";
@@ -228,7 +228,7 @@ format_reset(const char *base)
 static std::string inline
 format_name(const char *base)
 {
-	static const char *fmt =
+	const char *fmt =
 	"const char *\n"
 	"%s::_name() const\n"
 	"{\n"
@@ -237,6 +237,48 @@ format_name(const char *base)
 
 	char buff[1024];
 	snprintf(buff, 1024, fmt, base, base);
+	return buff;
+}
+
+static std::string inline
+format_tag(const char *base, int tag)
+{
+	const char *fmt =
+	"int\n"
+	"%s::_tag() const\n"
+	"{\n"
+	"\treturn 0x%X;\n"
+	"}\n";
+	char buff[1024];
+	snprintf(buff, 1024, fmt, base, tag);
+	return buff;
+}
+
+static std::string inline
+format_query(const char *base)
+{
+	const char *fmt =
+	"struct zproto_struct *%s::_st = nullptr;\n"
+	"struct zproto_struct *\n"
+	"%s::_query() const\n"
+	"{\n"
+	"\treturn _st;\n"
+	"}\n"
+	"void\n"
+	"%s::_load(wiretree &t)\n"
+	"{\n"
+	"\t%s::_st = t.query(\"%s\");\n"
+	"\tassert(%s::_st);\n"
+	"}\n";
+	char buff[1024];
+	snprintf(buff, 1024,"\t%s::_load(*this);\n", base);
+	querystmts.push_back(buff);
+	snprintf(buff, 1024, fmt,
+			base,
+			base,
+			base,
+			base, base,
+			base);
 	return buff;
 }
 
@@ -262,9 +304,17 @@ formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 	zproto_travel(st, prototype_cb, &newargs);
 	std::string tmp;
 
-	//name
-	tmp = format_name(newargs.base.c_str());
-	newargs.stmts.push_back(tmp);
+	if (protocol.count(st)) {
+		//_tag()
+		tmp = format_tag(newargs.base.c_str(), zproto_tag(st));
+		newargs.stmts.push_back(tmp);
+		//_name()
+		tmp = format_name(newargs.base.c_str());
+		newargs.stmts.push_back(tmp);
+		//_query()
+		tmp = format_query(newargs.base.c_str());
+		newargs.stmts.push_back(tmp);
+	}
 	//_reset()
 	tmp = format_reset(newargs.base.c_str());
 	newargs.resetstm.insert(newargs.resetstm.begin(), tmp);
@@ -361,7 +411,11 @@ wiretree(FILE *fp, const char *proto)
 	fprintf(fp,
 "serializer::serializer()\n"
 "	 :wiretree(def)\n"
-"{}\n"
+"{\n"
+);
+	dump_vecstring(fp, querystmts);
+	fprintf(fp,
+"}\n"
 "serializer &\n"
 "serializer::instance()\n"
 "{\n"
@@ -372,7 +426,7 @@ wiretree(FILE *fp, const char *proto)
 
 static const char *wirep =
 "wiretree&\n"
-"wirep::_wiretree() const\n"
+"wirepimpl::_wiretree() const\n"
 "{\n"
 "	return serializer::instance();\n"
 "}\n\n";
@@ -396,8 +450,8 @@ body(const char *name, std::vector<const char*> &space, const char *proto, struc
 	fprintf(fp, "#include \"%s.hpp\"\n", name);
 	for (const auto p:space)
 		fprintf(fp, "namespace %s {\n", p);
-	fprintf(fp, "\nusing namespace zprotobuf;\n\n");
-	fprintf(fp, wirep);
+	fprintf(fp, "%s", "\nusing namespace zprotobuf;\n\n");
+	fprintf(fp, "%s", wirep);
 	dumpst(fp, z, zproto_next(z, NULL));
 	wiretree(fp, proto);
 	for (size_t i = 0; i < space.size(); i++)

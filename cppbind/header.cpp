@@ -25,8 +25,8 @@ const char *funcproto = "\
 %svirtual int _decode_field(struct zproto_args *args);\n\
 %s\
 %spublic:\n\
-%svirtual const char *_name() const;\n\
 %svirtual void _reset();\n\
+%s\
 ";
 
 static std::string
@@ -69,7 +69,7 @@ formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newa
 	//open
 	const char *herit;
 	if (protocol.count(st))
-		herit = ":public wirep ";
+		herit = ":public wirepimpl";
 	else
 		herit = ":public wire ";
 	newargs.fields.insert(
@@ -86,6 +86,24 @@ formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newa
 		iterdefine = t1 + "mutable union iterator_wrapper _mapiterator;\n";
 	}
 	//member function
+	char wirep_query[2048];
+	if (protocol.count(st)) {
+		snprintf(wirep_query, 2048,
+				"%svirtual int _tag() const;\n"
+				"%svirtual const char *_name() const;\n"
+				"%svirtual zproto_struct *_query() const;\n"
+				"%sstatic void _load(wiretree &t);\n"
+				"%sprivate:\n"
+				"%sstatic zproto_struct *_st;\n",
+				t1.c_str(),
+				t1.c_str(),
+				t1.c_str(),
+				t1.c_str(),
+				t2.c_str(),
+				t1.c_str());
+	} else {
+		wirep_query[0] = 0;
+	}
         snprintf(buff, 2048, funcproto,
 			t2.c_str(),
 			iterwrapper.c_str(),
@@ -94,7 +112,7 @@ formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newa
 			iterdefine.c_str(),
 			t2.c_str(),
 			t1.c_str(),
-			t1.c_str());
+			wirep_query);
 	newargs.fields.push_back(buff);
 
 	//close
@@ -241,8 +259,8 @@ wiretree(FILE *fp)
 "};\n");
 }
 const char *wirep =
-"struct wirep:public iwirep {\n"
-"private:\n"
+"struct wirepimpl:public wirep {\n"
+"protected:\n"
 "        virtual wiretree &_wiretree() const;\n"
 "};\n\n";
 
@@ -265,8 +283,8 @@ header(const char *name, std::vector<const char *> &space, struct zproto *z)
 	fprintf(fp, "#include \"zprotowire.h\"\n");
 	for (const auto p:space)
 		fprintf(fp, "namespace %s {\n", p);
-	fprintf(fp, "\nusing namespace zprotobuf;\n\n");
-	fprintf(fp, wirep);
+	fprintf(fp, "%s", "\nusing namespace zprotobuf;\n\n");
+	fprintf(fp, "%s", wirep);
 	dumpst(fp, z, st);
 	wiretree(fp);
 	fprintf(fp, "\n");

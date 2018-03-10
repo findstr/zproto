@@ -2,8 +2,11 @@
 #include <stdio.h>
 #include <string>
 #include <vector>
+#include <pthread.h>
 #include <unordered_set>
 #include "hello_world.hpp"
+
+static hello::world::packet pk;
 
 static void
 print_hex(const uint8_t *buf, size_t sz)
@@ -28,7 +31,7 @@ print_struct(const hello::world::packet &pk)
 	printf("packet::bb:%s\n", pk.bb ? "true" : "false");
 	printf("packet::luck size:%lu\n", pk.luck.size());
 	for (size_t i = 0; i < pk.luck.size(); i++)
-		printf("%ld ", pk.luck[i]);
+		printf("%lld ", pk.luck[i]);
 	printf("\n");
 	for (const auto &iter:pk.address1)
 		printf("packet::address1 %s\n", iter.c_str());
@@ -79,8 +82,6 @@ assert_struct(const hello::world::packet &a, const hello::world::packet &b)
 	assert(a.bb == b.bb);
 }
 
-
-static hello::world::packet pk;
 
 static void
 test_normal()
@@ -152,7 +153,6 @@ test_thread(void *)
 	}
 	return NULL;
 }
-
 
 int main()
 {

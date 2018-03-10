@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 	proto[st.st_size] = 0;
 	err = zproto_parse(&parser, proto);
 	if (err < 0) {
-		fprintf(stderr, parser.error);
+		fprintf(stderr, "%s", parser.error);
 		delete proto;
 		return -1;
 	}

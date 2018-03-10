@@ -132,85 +132,6 @@ wire::_decode_proxy(struct zproto_args *args)
 	return _decode_field(args);
 }
 
-int
-wire::_serialize(std::string &dat) const
-{
-	(void)dat;
-	return ZPROTO_ERROR;
-}
-
-int
-wire::_serialize(const uint8_t **data) const
-{
-	(void)data;
-	return ZPROTO_ERROR;
-}
-
-int
-wire::_serializesafe(std::string &dat, int presize) const
-{
-	(void)dat;
-	(void)presize;
-	return ZPROTO_ERROR;
-}
-
-int
-wire::_parse(const std::string &dat)
-{
-	(void)dat;
-	return ZPROTO_ERROR;
-}
-int
-wire::_parse(const uint8_t *data, int datasz)
-{
-	(void)data;
-	(void)datasz;
-	return ZPROTO_ERROR;
-}
-
-int
-wire::_tag() const
-{
-	return 0;
-}
-
-int
-wire::_pack(const uint8_t *src, int srcsz, const uint8_t **dat)
-{
-	(void)src;
-	(void)srcsz;
-	(void)dat;
-	return ZPROTO_ERROR;
-}
-
-int
-wire::_pack(const uint8_t *src, int srcsz, std::string &dat)
-{
-	(void)src;
-	(void)srcsz;
-	(void)dat;
-	return ZPROTO_ERROR;
-}
-
-int
-wire::_unpack(const uint8_t *src, int srcsz, const uint8_t **dat)
-{
-	(void)src;
-	(void)srcsz;
-	(void)dat;
-	return ZPROTO_ERROR;
-}
-
-int
-wire::_unpack(const uint8_t *src, int srcsz, std::string &dat)
-{
-	(void)src;
-	(void)srcsz;
-	(void)dat;
-	return ZPROTO_ERROR;
-}
-
-
 void
 wire::_reset()
 {
@@ -247,8 +168,8 @@ public:
 		return *inst;
 	}
 public:
-	struct block marshal;
-	struct block cook;
+	class block marshal;
+	class block cook;
 };
 
 //syntax tree
@@ -271,22 +192,14 @@ wiretree::~wiretree()
 struct zproto_struct *
 wiretree::query(const char *name)
 {
-	struct zproto_struct *st;
-	intptr_t k = (intptr_t)name;
-	st = cache[k];
-	if (st)
-		return st;
-	st = zproto_query(z, name);
-	assert(st);
-	cache[k] = st;
-	return st;
+	return zproto_query(z, name);
 }
 
 int
-wiretree::encodecheck(const wire &w)
+wiretree::encodecheck(const wirep &w)
 {
 	int sz;
-	struct zproto_struct *st = query(w._name());
+	struct zproto_struct *st = w._query();
 	auto &marshal = buffer::instance().marshal;
 	for (;;) {
 		sz = w._encode(marshal.ptr, marshal.size, st);
@@ -350,7 +263,7 @@ wiretree::cooksafe(const uint8_t *src, int size, std::string &dat,
 }
 
 int
-wiretree::encode(const wire &w, std::string &dat)
+wiretree::encode(const wirep &w, std::string &dat)
 {
 	int sz;
 	dat.clear();
@@ -361,7 +274,7 @@ wiretree::encode(const wire &w, std::string &dat)
 }
 
 int
-wiretree::encode(const wire &w, const uint8_t **dat)
+wiretree::encode(const wirep &w, const uint8_t **dat)
 {
 	int sz;
 	sz = encodecheck(w);
@@ -411,11 +324,11 @@ wiretree::unpack(const uint8_t *src, int size, const uint8_t **dat)
 }
 
 int
-wiretree::encodesafe(const wire &w, std::string &dat, int presize)
+wiretree::encodesafe(const wirep &w, std::string &dat, int presize)
 {
 	int sz;
 	uint8_t *tmpbuf = new uint8_t[presize];
-	struct zproto_struct *st = query(w._name());
+	struct zproto_struct *st = w._query();
 	for (;;) {
 		sz = w._encode(tmpbuf, presize, st);
 		if (sz == ZPROTO_ERROR) {
@@ -452,84 +365,73 @@ wiretree::unpacksafe(const uint8_t *src, int size, std::string &dat, int presize
 }
 
 int
-wiretree::decode(wire &w, const std::string &dat)
+wiretree::decode(wirep &w, const std::string &dat)
 {
 	return decode(w, (uint8_t *)dat.data(), dat.size());
 }
 
 int
-wiretree::decode(wire &w, const uint8_t *dat, size_t datasz)
+wiretree::decode(wirep &w, const uint8_t *dat, size_t datasz)
 {
 	int sz;
-	struct zproto_struct *st = query(w._name());
+	struct zproto_struct *st = w._query();
 	sz = w._decode((uint8_t *)dat, datasz, st);
 	return sz;
 }
 
-int
-wiretree::tag(const wire &w)
-{
-	struct zproto_struct *st = query(w._name());
-	return zproto_tag(st);
-}
-
 //wire protocol interface
+
 int
-iwirep::_serialize(std::string &dat) const
+wirep::_serialize(std::string &dat) const
 {
+
 	return _wiretree().encode(*this, dat);
 }
 
 int
-iwirep::_serialize(const uint8_t **data) const
+wirep::_serialize(const uint8_t **data) const
 {
 	return _wiretree().encode(*this, data);
 }
 
 int
-iwirep::_serializesafe(std::string &dat, int presize) const
+wirep::_serializesafe(std::string &dat, int presize) const
 {
 	return _wiretree().encodesafe(*this, dat, presize);
 }
 
 int
-iwirep::_parse(const std::string &dat)
+wirep::_parse(const std::string &dat)
 {
 	return _wiretree().decode(*this, dat);
 }
 
 int
-iwirep::_parse(const uint8_t *data, int datasz)
+wirep::_parse(const uint8_t *data, int datasz)
 {
 	return _wiretree().decode(*this, data, datasz);
 }
 
 int
-iwirep::_tag() const
-{
-	return _wiretree().tag(*this);
-}
-
-int
-iwirep::_pack(const uint8_t *src, int srcsz, const uint8_t **dat)
+wirep::_pack(const uint8_t *src, int srcsz, const uint8_t **dat)
 {
 	return _wiretree().pack(src, srcsz, dat);
 }
 
 int
-iwirep::_pack(const uint8_t *src, int srcsz, std::string &dat)
+wirep::_pack(const uint8_t *src, int srcsz, std::string &dat)
 {
 	return _wiretree().pack(src, srcsz, dat);
 }
 
 int
-iwirep::_unpack(const uint8_t *src, int srcsz, const uint8_t **dat)
+wirep::_unpack(const uint8_t *src, int srcsz, const uint8_t **dat)
 {
 	return _wiretree().unpack(src, srcsz, dat);
 }
 
 int
-iwirep::_unpack(const uint8_t *src, int srcsz, std::string &dat)
+wirep::_unpack(const uint8_t *src, int srcsz, std::string &dat)
 {
 	return _wiretree().unpack(src, srcsz, dat);
 }
