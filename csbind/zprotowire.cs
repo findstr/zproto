@@ -25,6 +25,8 @@ namespace zprotobuf
 			return id;
 		}
 		private void udend(IntPtr id) {
+			Debug.Assert((IntPtr)oid == id);
+			--oid;
 			uds[id] = null;
 		}
 
