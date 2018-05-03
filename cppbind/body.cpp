@@ -287,8 +287,12 @@ static int prototype_cb(struct zproto_args *args);
 static void
 formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 {
-	struct zproto_struct *child;
-	for (child = zproto_child(z, st); child; child = zproto_next(z, child)) {
+	int count;
+	struct zproto_struct *const*start, *const*end;
+	start = zproto_child(z, st, &count);
+	end = start + count;
+	while (start < end) {
+		struct zproto_struct *child = *start;
 		struct stmt_args nnewargs;
 		assert(protocol.count(child) == 0);
 		assert(defined.count(child) == 0);
@@ -299,7 +303,7 @@ formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 		newargs.stmts.insert(newargs.stmts.end(),
 				nnewargs.stmts.begin(),
 				nnewargs.stmts.end());
-
+		++start;
 	}
 	zproto_travel(st, prototype_cb, &newargs);
 	std::string tmp;
@@ -383,16 +387,20 @@ dump_vecstring(FILE *fp, const std::vector<std::string> &tbl)
 }
 
 static void
-dumpst(FILE *fp, struct zproto *z, struct zproto_struct *st)
+dumpst(FILE *fp, struct zproto *z)
 {
-	struct stmt_args args;
-	struct zproto_struct *nxt = zproto_next(z, st);
-	if (st == NULL)
-		return;
-	args.base = zproto_name(st);
-	formatst(z, st, args);
-	dump_vecstring(fp, args.stmts);
-	dumpst(fp, z, nxt);
+	int count;
+	struct zproto_struct *const* start, *const* end;
+	start = zproto_child(z, NULL, &count);
+	end = start + count;
+	while (start < end) {
+		struct stmt_args args;
+		struct zproto_struct *st = *start;
+		args.base = zproto_name(st);
+		formatst(z, st, args);
+		dump_vecstring(fp, args.stmts);
+		++start;
+	}
 	return ;
 }
 
@@ -435,16 +443,19 @@ void
 body(const char *name, std::vector<const char*> &space, const char *proto, struct zproto *z)
 {
 	FILE *fp;
+	int count;
+	struct zproto_struct *const* start, *const* end;
 	std::string path = name;
 	path += ".cc";
 	fp = fopen(path.c_str(), "wb+");
-	struct zproto_struct *st = NULL;
-	for (;;) {
-		st = zproto_next(z, st);
-		if (st == NULL)
-			break;
+	start = zproto_child(z, NULL, &count);
+	end = start + count;
+	while (start < end) {
+		struct zproto_struct *st = *start;
 		protocol.insert(st);
+		++start;
 	}
+
 	fprintf(fp, "#include <string.h>\n");
 	fprintf(fp, "#include \"zprotowire.h\"\n");
 	fprintf(fp, "#include \"%s.hpp\"\n", name);
@@ -452,7 +463,7 @@ body(const char *name, std::vector<const char*> &space, const char *proto, struc
 		fprintf(fp, "namespace %s {\n", p);
 	fprintf(fp, "%s", "\nusing namespace zprotobuf;\n\n");
 	fprintf(fp, "%s", wirep);
-	dumpst(fp, z, zproto_next(z, NULL));
+	dumpst(fp, z);
 	wiretree(fp, proto);
 	for (size_t i = 0; i < space.size(); i++)
 		fprintf(fp, "}");

@@ -53,8 +53,7 @@ int zproto_tag(struct zproto_struct *st);
 const char *zproto_name(struct zproto_struct *st);
 
 //travel
-struct zproto_struct *zproto_next(struct zproto *z, struct zproto_struct *st);
-struct zproto_struct *zproto_child(struct zproto *z, struct zproto_struct *st);
+struct zproto_struct *const*zproto_child(struct zproto *z, struct zproto_struct *st, int *count);
 void zproto_travel(struct zproto_struct *st, zproto_cb_t cb, void *ud);
 
 int zproto_encode(struct zproto_struct *st, uint8_t *buff, int sz, zproto_cb_t cb, void *ud);
