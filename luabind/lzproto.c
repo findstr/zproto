@@ -209,18 +209,28 @@ encode_array(struct zproto_args *args)
 	lua_State *L = eud->L;
 	if (args->idx == 0) {
 		lua_getfield(L, -1, args->name);
-		if (lua_type(L, -1) == LUA_TNIL) {
+		if (lua_isnil(L, -1)) {
 			lua_pop(L, 1);
 			return ZPROTO_NOFIELD;
 		}
 		luaL_checktype(L, -1, LUA_TTABLE);
-		lua_pushnil(L);
+		if (args->maptag)
+			lua_pushnil(L);
 	}
-	n = lua_next(L, -2);
-	if (n == 0) {
-		args->len = args->idx;
-		lua_pop(L, 1);
-		return ZPROTO_NOFIELD;
+	if (args->maptag) {
+		n = lua_next(L, -2);
+		if (n == 0) {
+			args->len = args->idx;
+			lua_pop(L, 1);
+			return ZPROTO_NOFIELD;
+		}
+	} else {
+		lua_geti(L, -1, args->idx + 1);
+		if (lua_isnil(L, -1)) {
+			args->len = args->idx;
+			lua_pop(L, 2);
+			return ZPROTO_NOFIELD;
+		}
 	}
 	sz = encode_field(args);
 	lua_pop(L, 1);
@@ -242,7 +252,7 @@ encode_table(struct zproto_args *args)
 		sz = encode_array(args);
 	} else {
 		lua_getfield(L, -1, args->name);
-		if (lua_type(L, -1) == LUA_TNIL) {
+		if (lua_isnil(L, -1)) {
 			lua_pop(L, 1);
 			return ZPROTO_NOFIELD;
 		}

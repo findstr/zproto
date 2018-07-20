@@ -1,4 +1,5 @@
 local zproto = require "zproto"
+local json = require "json"
 local rand = require "rand"
 
 local protostr1 = [[
@@ -18,7 +19,7 @@ packet 0xfe {
 	dummy {
 	}
 	.phone:phone 1
-	.info:info[] 2
+	.info:info[name] 2
 	.empty:string[] 8
 	.address:string 13
 	.dummy2:string 18
@@ -66,35 +67,17 @@ assert(newproto)
 local packet = {
 	phone = {home=0x12345678abcf, work=654321, negwork = -654321},
 	info = {
-			{name = "lucy", age = 18.3, girl = false, boy = true},
-			{name="lilei", age = 24.5, girl = true, boy = false},
-		},
+		["lucy"] = {name = "lucy", age = 18.3, girl = false, boy = true},
+		["lilei"] = {name="lilei", age = 24.5, girl = true, boy = false},
+	},
 	address = "China.shanghai",
 	luck = {1, -3, 9},
 	empty = {},
 	new = {
-		{name = "hanmeimei", age=25, girl = true, boy = false, new = {"hnew1", "hnew2"}},
-		{name = "jim", age=27, girl = false , boy = true, new = {"jnew1", "jnew2"}},
+		["hanmeimei"] = {name = "hanmeimei", age=25, girl = true, boy = false, new = {"hnew1", "hnew2"}},
+		["jim"] = {name = "jim", age=27, girl = false , boy = true, new = {"jnew1", "jnew2"}},
 	}
 }
-
-local function print_r(tbl, s, n)
-	n = n or 0
-	s = s or ""
-	for k, v in pairs(tbl) do
-		str = ""
-		for i = 1, n do
-			str = str .. " "
-		end
-		str = str .. s .. k .. ":"
-
-		if type(v) == "table" then
-			print_r(v, str, n + 1)
-		else
-			print(str, v)
-		end
-	end
-end
 
 local function print_hex(dat)
 	local str = ""
@@ -123,10 +106,13 @@ local function test_eq(a, b)
 		return
 	end
 	for k, v in pairs(a) do
-		if type(v) == "table" then
+		local t = type(v)
+		if t == "table" then
 			test_eq(v, b[k])
+		elseif t == "number" then
+			assert(math.abs(v - b[k]) < 0.1, k)
 		else
-			assert(v == b[k])
+			assert(v == b[k], k)
 		end
 	end
 end
@@ -145,10 +131,12 @@ end
 local function testwire()
 	print("=========begin test wire=============")
 	print("+++++++source table")
-	print("empty table", packet.empty, #packet.empty)
 	local buf = {}
-	print_r(packet)
+	print("data", 1)
+	print(json.encode(packet))
+	print("data", 2)
 	local data = newproto:encode(0xfe, packet)
+	print("data", #data)
 	for i = 1, #data do
 		buf[#buf + 1] = string.format("%02x", data:byte(i))
 	end
@@ -157,8 +145,7 @@ local function testwire()
 	data = newproto:unpack(data)
 	local unpack = newproto:decode("packet", data)
 	print("------dest table", unpack)
-	print("empty table", unpack.empty, #unpack.empty)
-	print_r(unpack)
+	print(json.encode(unpack))
 	test_eq(unpack, packet)
 	print("=========stop test wire=============")
 end
@@ -175,15 +162,13 @@ end
 local function testcompatible(name, e, d)
 	print(string.format("=========begin test compatible %s =============", name))
 	print("+++++++source table")
-	print("empty table", packet.empty, #packet.empty)
-	print_r(packet)
+	print(name, "source", json.encode(packet))
 	local data = e:encode(0xfe, packet)
 	data = e:pack(data)
 	data = d:unpack(data)
 	local unpack = d:decode("packet", data)
-	print("------dest table")
+	print(name, "destination", json.encode(unpack))
 	print("empty table", unpack.empty, #unpack.empty)
-	print_r(unpack)
 	print(string.format("=========stop test compatible %s =============", name))
 end
 
