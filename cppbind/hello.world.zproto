@@ -19,13 +19,16 @@ packet 0xfe {
 	#中文注释
 	.phone:phone[home] 1
 	.phone2:phone[work] 2
-	.address:string 3
+	.address:byte[] 3
 	.luck:long[] 4
 	.address1:string[] 5
 	.ii:integer 6
 	.ff:float 7
 	.ll:long 8
 	.bb:boolean 9
+	.int8:byte 10
+	.int16:short 11
+
 }
 
 

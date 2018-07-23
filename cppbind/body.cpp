@@ -72,15 +72,16 @@ reset_normal(struct zproto_args *args)
 		fmt = "\t%s.clear();\n";
 	} else {
 		switch (args->type) {
+		case ZPROTO_BLOB:
 		case ZPROTO_STRING:
 			fmt = "\t%s.clear();\n";
 			break;
 		case ZPROTO_BOOLEAN:
 			fmt = "\t%s = false;\n";
 			break;
+		case ZPROTO_BYTE:
+		case ZPROTO_SHORT:
 		case ZPROTO_INTEGER:
-			fmt = "\t%s = 0;\n";
-			break;
 		case ZPROTO_LONG:
 			fmt = "\t%s = 0;\n";
 			break;
@@ -98,30 +99,30 @@ fill_struct(struct zproto_args *args)
 {
 	char buff[1024];
 	const char *fmt =
-"	 case %d:\n"
-"		 return %s._encode(args->buff, args->buffsz, args->sttype);\n";
+	"\tcase %d:\n"
+	"\t\treturn %s._encode(args->buff, args->buffsz, args->sttype);\n";
 
 	const char *afmt =
-"	 case %d:\n"
-"		 if (args->idx >= (int)%s.size()) {\n"
-"			 args->len = args->idx;\n"
-"			 return ZPROTO_NOFIELD;\n"
-"		 }\n"
-"		 return %s[args->idx]._encode(args->buff, args->buffsz, args->sttype);\n";
+	"\tcase %d:\n"
+	"\t\tif (args->idx >= (int)%s.size()) {\n"
+	"\t\t\targs->len = args->idx;\n"
+	"\t\t\treturn ZPROTO_NOFIELD;\n"
+	"\t\t}\n"
+	"\t\treturn %s[args->idx]._encode(args->buff, args->buffsz, args->sttype);\n";
 
 	const char *mfmt =
-"	 case %d: {\n"
-"		 int ret;\n"
-"		 if (args->idx == 0) {\n"
-"			 _mapiterator.%s = %s.begin();\n"
-"		 }\n"
-"		 if (_mapiterator.%s == %s.end()) {\n"
-"			 args->len = args->idx;\n"
-"			 return ZPROTO_NOFIELD;\n"
-"		 }\n"
-"		 ret = _mapiterator.%s->second._encode(args->buff, args->buffsz, args->sttype);\n"
-"		 ++_mapiterator.%s;\n"
-"		 return ret;}\n";
+	"\tcase %d: {\n"
+	"\t\tint ret;\n"
+	"\t\tif (args->idx == 0) {\n"
+	"\t\t\t_mapiterator.%s = %s.begin();\n"
+	"\t\t}\n"
+	"\t\tif (_mapiterator.%s == %s.end()) {\n"
+	"\t\t\targs->len = args->idx;\n"
+	"\t\t\treturn ZPROTO_NOFIELD;\n"
+	"\t\t}\n"
+	"\t\tret = _mapiterator.%s->second._encode(args->buff, args->buffsz, args->sttype);\n"
+	"\t\t++_mapiterator.%s;\n"
+	"\t\treturn ret;}\n";
 
 	if (args->maptag) {
 		assert(args->idx >= 0);
@@ -143,28 +144,26 @@ to_struct(struct zproto_args *args)
 {
 	char buff[512];
 	const char *fmt =
-"	 case %d:\n"
-"		 return %s._decode(args->buff, args->buffsz, args->sttype);\n";
+	"\tcase %d:\n"
+	"\t\treturn %s._decode(args->buff, args->buffsz, args->sttype);\n";
 	const char *afmt =
-"	 case %d:\n"
-"		 assert(args->idx >= 0);\n"
-"		 if (args->len == 0)\n"
-"			 return 0;\n"
-"		 %s.resize(args->idx + 1);\n"
-"		 return %s[args->idx]._decode(args->buff, args->buffsz, args->sttype);\n";
-
+	"\tcase %d:\n"
+	"\t\tassert(args->idx >= 0);\n"
+	"\t\tif (args->len == 0)\n"
+	"\t\t\treturn 0;\n"
+	"\t\t%s.resize(args->idx + 1);\n"
+	"\t\treturn %s[args->idx]._decode(args->buff, args->buffsz, args->sttype);\n";
 	const char *mfmt =
-"	 case %d: {\n"
-"		 int ret;\n"
-"		 struct %s _tmp;\n"
-"		 assert(args->idx >= 0);\n"
-"		 if (args->len == 0)\n"
-"			 return 0;\n"
-"		 ret = _tmp._decode(args->buff, args->buffsz, args->sttype);\n"
-"		 %s[_tmp.%s] = std::move(_tmp);\n"
-"		 return ret;\n"
-"		 }\n";
-
+	"\tcase %d: {\n"
+	"\t\tint ret;\n"
+	"\t\tstruct %s _tmp;\n"
+	"\t\tassert(args->idx >= 0);\n"
+	"\t\tif (args->len == 0)\n"
+	"\t\treturn 0;\n"
+	"\t\tret = _tmp._decode(args->buff, args->buffsz, args->sttype);\n"
+	"\t\t%s[_tmp.%s] = std::move(_tmp);\n"
+	"\t\treturn ret;\n"
+	"\t}\n";
 	if (args->maptag) {
 		assert(args->idx >= 0);
 		snprintf(buff, 512, mfmt, args->tag, zproto_name(args->sttype), args->name, args->mapname);
@@ -360,8 +359,11 @@ prototype_cb(struct zproto_args *args)
 		dstm = to_struct(args);
 		rstm = reset_struct(args);
 		break;
+	case ZPROTO_BLOB:
 	case ZPROTO_STRING:
 	case ZPROTO_BOOLEAN:
+	case ZPROTO_BYTE:
+	case ZPROTO_SHORT:
 	case ZPROTO_INTEGER:
 	case ZPROTO_LONG:
 	case ZPROTO_FLOAT:

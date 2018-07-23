@@ -93,7 +93,6 @@ lfree(lua_State *L)
 	struct zproto *z = zproto(L);
 	assert(z);
 	zproto_free(z);
-
 	return 0;
 }
 
@@ -109,9 +108,8 @@ lquery(lua_State *L)
 		const char *name = luaL_checkstring(L, 2);
 		r = zproto_query(z, name);
 	} else {
-		luaL_error(L, "lquery expedted integer/string, but got:%d\n", lua_type(L, 2));
+		luaL_error(L, "integer/string expected got:%d\n", lua_type(L, 2));
 	}
-
 	if (r == NULL) {
 		lua_pushnil(L);
 		lua_pushnil(L);
@@ -128,76 +126,86 @@ struct lencode_ud {
 	lua_State *L;
 };
 
+#define uint8(ptr)    (*(uint8_t *)ptr)
+#define int8(ptr)   (*(int8_t *)ptr)
+#define int16(ptr)   (*(int16_t *)ptr)
+#define int32(ptr)   (*(int32_t *)ptr)
+#define int64(ptr)   (*(int64_t *)ptr)
+#define float32(ptr)  (*(float *)ptr)
+
 #define CHECK_OOM(sz, need) \
 	if (sz < (int)(need))\
 		return ZPROTO_OOM;
 
-#define uint8(ptr)    (*(uint8_t *)ptr)
-#define int32(ptr)   (*(int32_t *)ptr)
-#define int64(ptr)   (*(int64_t *)ptr)
-#define float32(ptr)  (*(float *)ptr)
+#define checktype(expect)	checktype_(L, name, lua_type(L, -1), expect)
+
+#define ENCODE_INTEGER(type)\
+	checktype(LUA_TNUMBER);\
+	d = luaL_checkinteger(L, -1);\
+	type(args->buff) = (type##_t)d;\
+	return sizeof(type##_t);
+
+static int
+checktype_(lua_State *L, const char *name, int type, int expect)
+{
+	if (type != expect) {
+		const char *t = lua_typename(L, type);
+		const char *e = lua_typename(L, expect);
+		return luaL_error(L, "'%s':%s expected got %s\n", name, e, t);
+	}
+	return 0;
+}
+
 
 static int encode_table(struct zproto_args *args);
 
 static int
 encode_field(struct zproto_args *args)
 {
+	lua_Integer d;
 	struct lencode_ud *eud = args->ud;
 	lua_State *L = eud->L;
 	const char *name = args->name;
-	switch (args->type) {
+	switch(args->type) {
 	case ZPROTO_BOOLEAN: {
-		if (lua_type(L, -1) != LUA_TBOOLEAN)
-			return luaL_error(L, "encode data:need boolean field:%s\n", name);
-		CHECK_OOM(args->buffsz, sizeof(uint8_t))
-		int8_t d = lua_toboolean(L, -1);
+		checktype(LUA_TBOOLEAN);
+		uint8_t d = lua_toboolean(L, -1);
 		uint8(args->buff) = d;
 		return sizeof(uint8_t);
 	}
-	case ZPROTO_INTEGER: {
-		if (lua_type(L, -1) != LUA_TNUMBER)
-			return luaL_error(L, "encode_data:need integer field:%s\n", name);
-		CHECK_OOM(args->buffsz, sizeof(int32_t))
-		lua_Integer d = luaL_checkinteger(L, -1);
-		int32(args->buff) = (int32_t)d;
-		return sizeof(int32_t);
-	}
-	case ZPROTO_LONG: {
-		if (lua_type(L, -1) != LUA_TNUMBER)
-			return luaL_error(L, "encode_data need long field:%s\n", name);
-		CHECK_OOM(args->buffsz, sizeof(int64_t));
-		lua_Integer d = luaL_checkinteger(L, -1);
-		int64(args->buff) = (int64_t)d;
-		return sizeof(int64_t);
-	}
+	case ZPROTO_BYTE:
+		ENCODE_INTEGER(int8);
+	case ZPROTO_SHORT:
+		ENCODE_INTEGER(int16);
+	case ZPROTO_INTEGER:
+		ENCODE_INTEGER(int32);
+	case ZPROTO_LONG:
+		ENCODE_INTEGER(int64);
 	case ZPROTO_FLOAT: {
-		if (lua_type(L, -1) != LUA_TNUMBER)
-			return luaL_error(L, "encode_data:need float field:%s\n", name);
-		CHECK_OOM(args->buffsz, sizeof(float))
+		checktype(LUA_TNUMBER);
 		lua_Number d = luaL_checknumber(L, -1);
 		float32(args->buff) = (float)d;
 		return sizeof(float);
 	}
+	case ZPROTO_BLOB:
 	case ZPROTO_STRING: {
-		if (lua_type(L, -1) != LUA_TSTRING)
-			return luaL_error(L, "encode_data:need string field:%s\n", name);
 		size_t sz;
-		const char *d = luaL_checklstring(L, -1, &sz);
-		CHECK_OOM(args->buffsz, sz)
+		const char *d;
+		checktype(LUA_TSTRING);
+		d = luaL_checklstring(L, -1, &sz);
+		CHECK_OOM(args->buffsz, sz);
 		memcpy(args->buff, d, sz);
 		return sz;
 	}
 	case ZPROTO_STRUCT: {
-		if (lua_type(L, -1) != LUA_TTABLE)
-			return luaL_error(L, "encode_data:need table field:%s\n", name);
 		struct lencode_ud ud;
+		checktype(LUA_TTABLE);
 		ud.level = eud->level + 1;
 		ud.L = eud->L;
 		return zproto_encode(args->sttype, args->buff, args->buffsz, encode_table, &ud);
 	}
-	default:
-		return luaL_error(L, "encode_data, unkonw field type:%d\n", args->type);
 	}
+	return ZPROTO_ERROR;
 }
 
 static int
@@ -208,12 +216,13 @@ encode_array(struct zproto_args *args)
 	struct lencode_ud *eud = args->ud;
 	lua_State *L = eud->L;
 	if (args->idx == 0) {
-		lua_getfield(L, -1, args->name);
-		if (lua_isnil(L, -1)) {
+		int type;
+		type = lua_getfield(L, -1, args->name);
+		if (type == LUA_TNIL) {
 			lua_pop(L, 1);
 			return ZPROTO_NOFIELD;
 		}
-		luaL_checktype(L, -1, LUA_TTABLE);
+		checktype_(L, args->name, type, LUA_TTABLE);
 		if (args->maptag)
 			lua_pushnil(L);
 	}
@@ -225,8 +234,9 @@ encode_array(struct zproto_args *args)
 			return ZPROTO_NOFIELD;
 		}
 	} else {
-		lua_geti(L, -1, args->idx + 1);
-		if (lua_isnil(L, -1)) {
+		int type;
+		type = lua_geti(L, -1, args->idx + 1);
+		if (type == LUA_TNIL) {
 			args->len = args->idx;
 			lua_pop(L, 2);
 			return ZPROTO_NOFIELD;
@@ -251,8 +261,8 @@ encode_table(struct zproto_args *args)
 	if (args->idx >= 0) {
 		sz = encode_array(args);
 	} else {
-		lua_getfield(L, -1, args->name);
-		if (lua_isnil(L, -1)) {
+		int type = lua_getfield(L, -1, args->name);
+		if (type == LUA_TNIL) {
 			lua_pop(L, 1);
 			return ZPROTO_NOFIELD;
 		}
@@ -322,62 +332,54 @@ struct ldecode_ud {
 static int decode_table(struct zproto_args *args);
 
 static int
-decode_field(struct zproto_args *args, int dupidx)
+decode_field(struct zproto_args *args)
 {
-	int ret;
 	lua_State *L;
 	struct ldecode_ud ud;
-	struct ldecode_ud *now = args->ud;
+	struct ldecode_ud *now;
+	now = args->ud;
 	L = now->L;
-	switch (args->type) {
+	switch(args->type) {
 	case ZPROTO_BOOLEAN:
 		lua_pushboolean(L, uint8(args->buff));
-		ret = args->buffsz;
-		break;
-	case ZPROTO_STRING:
-		lua_pushlstring(L, (char *)args->buff, args->buffsz);
-		ret = args->buffsz;
-		break;
+		return sizeof(uint8_t);
+	case ZPROTO_BYTE:
+		lua_pushinteger(L, int8(args->buff));
+		return sizeof(int8_t);
+	case ZPROTO_SHORT:
+		lua_pushinteger(L, int16(args->buff));
+		return sizeof(int16_t);
 	case ZPROTO_INTEGER:
 		lua_pushinteger(L, int32(args->buff));
-		ret = args->buffsz;
-		break;
+		return sizeof(int32_t);
 	case ZPROTO_LONG:
 		lua_pushinteger(L, int64(args->buff));
-		ret = args->buffsz;
-		break;
+		return sizeof(int64_t);
 	case ZPROTO_FLOAT:
 		lua_pushnumber(L, float32(args->buff));
-		ret = args->buffsz;
-		break;
+		return sizeof(uint32_t);
+	case ZPROTO_BLOB:
+	case ZPROTO_STRING:
+		lua_pushlstring(L, (char *)args->buff, args->buffsz);
+		return args->buffsz;
 	case ZPROTO_STRUCT:
-		lua_newtable(L);
 		ud.L = L;
 		ud.level = now->level + 1;
 		if (args->maptag) {
+			int dupidx;
+			lua_pushnil(L);
+			dupidx = lua_gettop(L);
 			assert(args->idx >= 0);
-			assert(dupidx > 0);
 			ud.duptag = args->maptag;
 			ud.dupidx = dupidx;
 		} else {
 			ud.duptag = 0;
 			ud.dupidx = 0;
 		}
-		ret = zproto_decode(args->sttype, args->buff, args->buffsz, decode_table, &ud);
-		break;
-	default:
-		fprintf(stderr, "invalid field type:%d\n", args->type);
-		return ZPROTO_ERROR;
+		lua_newtable(L);
+		return zproto_decode(args->sttype, args->buff, args->buffsz, decode_table, &ud);
 	}
-
-	if (now->duptag == args->tag) {
-		assert(now->duptag > 0);
-		assert(now->dupidx > 0);
-		assert(args->type != ZPROTO_STRUCT);
-		lua_pushvalue(L, -1);
-		lua_replace(L, now->dupidx);
-	}
-	return ret;
+	return ZPROTO_ERROR;
 }
 
 static int
@@ -395,13 +397,12 @@ decode_array(struct zproto_args *args)
 	assert(args->tag != now->duptag);
 	if (args->maptag) {	//map
 		assert(args->type == ZPROTO_STRUCT);
-		lua_pushnil(L);
-		sz = decode_field(args, lua_gettop(L));
+		sz = decode_field(args);
 		if (sz < 0)
 			return sz;
 		lua_settable(L, -3);
 	} else {
-		sz = decode_field(args, 0);
+		sz = decode_field(args);
 		if (sz < 0)
 			return sz;
 		//zproto array index start with 0
@@ -421,11 +422,18 @@ decode_table(struct zproto_args *args)
 		fprintf(stderr, fmt, ud->level, lua_gettop(L));
 		return ZPROTO_ERROR;
 	}
-	if (args->idx >= 0)
+	if (args->idx >= 0) {
 		sz = decode_array(args);
-	else
-		sz = decode_field(args, 0);
-
+	} else {
+		sz = decode_field(args);
+		if (ud->duptag == args->tag) {
+			assert(ud->duptag > 0);
+			assert(ud->dupidx > 0);
+			assert(args->type != ZPROTO_STRUCT);
+			lua_pushvalue(L, -1);
+			lua_replace(L, ud->dupidx);
+		}
+	}
 	if (sz < 0)
 		return sz;
 	if (args->idx + 1 >= args->len)
@@ -464,7 +472,6 @@ ldecode(lua_State *L)
 	size_t datasz;
 	const uint8_t *data;
 	struct zproto_struct *st = lua_touserdata(L, 1);
-
 	lua_checkstack(L, MAX_RECURSIVE * 3 + 8);
 	data = (uint8_t *)get_buffer(L, 2, &datasz);
 	lua_newtable(L);

@@ -61,7 +61,7 @@ fill_normal(struct zproto_args *args, int level)
 }
 
 static std::string inline
-to_string(struct zproto_args *args, int level)
+to_blob(struct zproto_args *args, int level)
 {
 	char buff[512];
 	const char *fmt =
@@ -92,6 +92,41 @@ to_string(struct zproto_args *args, int level)
 	}
 	return buff;
 }
+
+static std::string inline
+to_string(struct zproto_args *args, int level)
+{
+	char buff[512];
+	const char *fmt =
+	"%s\tcase %d:\n"
+	"%s\t\treturn read(ref args, out %s);\n";
+
+	const char *afmt =
+	"%s\tcase %d:\n"
+	"%s\t\tif (args.idx == 0)\n"
+	"%s\t\t\t%s = new string[args.len];\n"
+	"%s\t\tif (args.len == 0)\n"
+	"%s\t\t\treturn 0;\n"
+	"%s\t\treturn read(ref args, out %s[args.idx]);\n";
+
+	std::string t = tab(level);
+	if (args->idx >= 0) {
+		snprintf(buff, 512, afmt,
+			t.c_str(), args->tag,
+			t.c_str(),
+			t.c_str(), args->name,
+			t.c_str(),
+			t.c_str(),
+			t.c_str(), args->name);
+	} else {
+		snprintf(buff, 512, fmt,
+			t.c_str(), args->tag,
+			t.c_str(), args->name);
+	}
+	return buff;
+}
+
+
 
 static std::string inline
 to_normal(struct zproto_args *args, const char *type, int level)
@@ -339,13 +374,26 @@ prototype_cb(struct zproto_args *args)
 		estm = fill_struct(args, ud->level);
 		dstm = to_struct(args, subtype.c_str(), ud->level);
 		break;
-	case ZPROTO_STRING:
+	case ZPROTO_BLOB:
 		subtype = "byte[]";
+		estm = fill_normal(args, ud->level);
+		dstm = to_blob(args, ud->level);
+		break;
+	case ZPROTO_STRING:
+		subtype = "string";
 		estm = fill_normal(args, ud->level);
 		dstm = to_string(args, ud->level);
 		break;
 	case ZPROTO_BOOLEAN:
 		subtype = "bool";
+		goto gen;
+		break;
+	case ZPROTO_BYTE:
+		subtype = "sbyte";
+		goto gen;
+		break;
+	case ZPROTO_SHORT:
+		subtype = "short";
 		goto gen;
 		break;
 	case ZPROTO_INTEGER:

@@ -13,12 +13,10 @@ namespace zprotobuf
 			wire obj = uds[arg.ud];
 			return obj._encode_field(ref arg);
 		}
-
 		private static int decode_cb(ref zdll.args arg) {
 			wire obj = uds[arg.ud];
 			return obj._decode_field(ref arg);
 		}
-
 		private IntPtr udbegin() {
 			IntPtr id = (IntPtr)(++oid);
 			uds[id] = this;
@@ -29,64 +27,67 @@ namespace zprotobuf
 			--oid;
 			uds[id] = null;
 		}
-
+		protected int write(ref zdll.args arg, string val) {
+			byte[] src = Encoding.ASCII.GetBytes(val);
+			return write(ref arg, src);
+		}
 		protected int write(ref zdll.args arg, byte[] src) {
 			if (src.Length > arg.buffsz)
 				return zdll.OOM;
 			Marshal.Copy(src, 0, arg.buff, src.Length);
 			return src.Length;
 		}
-
 		protected int write(ref zdll.args arg, bool val) {
 			byte[] src = BitConverter.GetBytes(val);
- 			return write(ref arg, src);
+			return write(ref arg, src);
 		}
-
+		protected int write(ref zdll.args arg, sbyte val) {
+			byte[] src = new byte[1];
+			src[0] = (byte)val;
+			return write(ref arg, src);
+		}
+		protected int write(ref zdll.args arg, short val) {
+			byte[] src = BitConverter.GetBytes(val);
+			return write(ref arg, src);
+		}
 		protected int write(ref zdll.args arg, int val) {
 			byte[] src = BitConverter.GetBytes(val);
 			return write(ref arg, src);
 		}
-
 		protected int write(ref zdll.args arg, long val) {
 			byte[] src = BitConverter.GetBytes(val);
 			return write(ref arg, src);
 		}
-
 		protected int write(ref zdll.args arg, float val) {
 			byte[] src = BitConverter.GetBytes(val);
 			return write(ref arg, src);
 		}
-
 		private byte[] read(ref zdll.args arg) {
 			byte[] ret = new byte[arg.buffsz];
 			Marshal.Copy(arg.buff, ret, 0, ret.Length);
 			return ret;
 		}
 		protected int read(ref zdll.args arg, out bool val) {
-			val = false;
-			if (arg.buffsz < 1)
-				return zdll.ERROR;
 			val = BitConverter.ToBoolean(read(ref arg), 0);
 			return arg.buffsz;
 		}
+		protected int read(ref zdll.args arg, out sbyte val) {
+			val = (sbyte)read(ref arg)[0];
+			return arg.buffsz;
+		}
+		protected int read(ref zdll.args arg, out short val) {
+			val = BitConverter.ToInt16(read(ref arg), 0);
+			return arg.buffsz;
+		}
 		protected int read(ref zdll.args arg, out int val) {
-			val = 0;
-			if (arg.buffsz < sizeof(int))
-				return zdll.ERROR;
 			val = BitConverter.ToInt32(read(ref arg), 0);
 			return arg.buffsz;
 		}
 		protected int read(ref zdll.args arg, out long val) {
-			val = 0;
-			if (arg.buffsz < sizeof(long))
-				return zdll.ERROR;
 			val = BitConverter.ToInt64(read(ref arg), 0);
 			return arg.buffsz;
 		}
 		protected int read(ref zdll.args arg, out float val) {
-			val = 0.0f;
-			if (arg.buffsz < sizeof(float))
-				return zdll.ERROR;
 			val = BitConverter.ToSingle(read(ref arg), 0);
 			return arg.buffsz;
 		}
@@ -94,21 +95,22 @@ namespace zprotobuf
 			val = read(ref arg);
 			return arg.buffsz;
 		}
-
+		protected int read(ref zdll.args arg, out string val) {
+			val = Encoding.Default.GetString(read(ref arg));
+			return arg.buffsz;
+		}
 		public int _encode(IntPtr buff, int len, IntPtr st) {
 			IntPtr id = udbegin();
 			int err = zdll.encode(st, buff, len, encode_cb, id);
 			udend(id);
 			return err;
 		}
-
 		public int _decode(IntPtr buff, int len, IntPtr st) {
 			IntPtr id = udbegin();
 			int err = zdll.decode(st, buff, len, decode_cb, id);
 			udend(id);
 			return err;
 		}
-
 		public virtual int _serialize(out byte[] dat) {
 			dat = null;
 			Debug.Assert("NotImplement" == null);

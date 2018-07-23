@@ -503,16 +503,22 @@ lex_typeint(struct lexstate *l, struct lexstruct *node,
 {
 	int typen;
 	*seminfo = NULL;
-	if (strcmp(type, "boolean") == 0) {
-		typen = ZPROTO_BOOLEAN;
+	if (strcmp(type, "string") == 0) {
+		typen = ZPROTO_STRING;
 	} else if (strcmp(type, "integer") == 0) {
 		typen = ZPROTO_INTEGER;
 	} else if (strcmp(type, "long") == 0) {
 		typen = ZPROTO_LONG;
+	} else if (strcmp(type, "byte") == 0) {
+		typen = ZPROTO_BYTE;
+	} else if (strcmp(type, "short") == 0) {
+		typen = ZPROTO_SHORT;
 	} else if (strcmp(type, "float") == 0) {
 		typen = ZPROTO_FLOAT;
-	} else if (strcmp(type, "string") == 0) {
-		typen = ZPROTO_STRING;
+	} else if (strcmp(type, "boolean") == 0) {
+		typen = ZPROTO_BOOLEAN;
+	} else if (strcmp(type, "blob") == 0) {
+		typen = ZPROTO_BLOB;
 	} else {
 		*seminfo = lex_findstruct(node, type);
 		if (*seminfo == NULL)
@@ -550,13 +556,17 @@ lex_field(struct lexstate *l, struct lexstruct *node)
 	//[mapkey]
 	ahead = lex_lookahead(l);
 	if (ahead == '[') {	//is a array ?
+		int type = f->type;
 		NEXT_TOKEN(l, '[');
 		f->type |= ZPROTO_ARRAY;
 		ahead = lex_lookahead(l);
-		if (ahead != ']') //just only a map array ?
+		if (ahead != ']') { //just only a map array ?
 			NEXT_STRING(l, mapkey);
-		else
+		} else {
 			mapkey[0] = 0;
+			if (type == ZPROTO_BYTE) //byte[] is blob type
+				f->type = ZPROTO_BLOB;
+		}
 		NEXT_TOKEN(l, ']');
 	} else {
 		mapkey[0] = 0;
@@ -881,26 +891,36 @@ queryfield(struct zproto_struct *st, int tag)
 	return NULL;
 }
 
-#define CHECK_OOM(sz, need)    \
+#define CHECK_OOM(sz, need)\
 	if (sz < (int)(need))\
 		return ZPROTO_OOM;
+#define ENCODE(type) \
+	CHECK_OOM(args->buffsz, sizeof(type))\
+	args->buffsz = sizeof(type);\
+	sz = cb(args);\
+	if (sz < 0)\
+		return sz;\
+	return sizeof(type);
 
 static int
 encode_field(struct zproto_args *args, zproto_cb_t cb)
 {
 	int sz;
 	len_t *len;
-	switch (args->type) {
+	switch(args->type) {
 	case ZPROTO_BOOLEAN:
-		CHECK_OOM(args->buffsz, sizeof(uint8_t))
-		return cb(args);
+		ENCODE(uint8_t);
+	case ZPROTO_BYTE:
+		ENCODE(int8_t);
+	case ZPROTO_SHORT:
+		ENCODE(int16_t);
 	case ZPROTO_INTEGER:
+		ENCODE(int32_t);
 	case ZPROTO_FLOAT:
-		CHECK_OOM(args->buffsz, sizeof(int32_t))
-		return cb(args);
+		ENCODE(uint32_t);
 	case ZPROTO_LONG:
-		CHECK_OOM(args->buffsz, sizeof(int64_t));
-		return cb(args);
+		ENCODE(int64_t);
+	case ZPROTO_BLOB:
 	case ZPROTO_STRING:
 		CHECK_OOM(args->buffsz, sizeof(len_t))
 		len = (len_t *)args->buff;
@@ -913,11 +933,7 @@ encode_field(struct zproto_args *args, zproto_cb_t cb)
 		sz += sizeof(len_t);
 		return sz;
 	case ZPROTO_STRUCT:
-		CHECK_OOM(args->buffsz, sizeof(hdr_t))
 		return cb(args);
-	default:
-		assert(!"unkown field type");
-		break;
 	}
 	return ZPROTO_ERROR;
 }
@@ -930,7 +946,6 @@ encode_array(struct zproto_args *args, zproto_cb_t cb)
 	int buffsz = args->buffsz;
 	uint8_t *buff = args->buff;
 	uint8_t *start = buff;
-
 	CHECK_OOM(buffsz, sizeof(len_t))
 	len = (len_t *)buff;
 	buff += sizeof(len_t);
@@ -1017,25 +1032,30 @@ zproto_encode(struct zproto_struct *st, uint8_t *buff, int sz, zproto_cb_t cb, v
 	if (sz < (int)(need))\
 		return ZPROTO_ERROR;
 
+#define DECODE(type)\
+	CHECK_VALID(args->buffsz, sizeof(type))\
+	args->buffsz = sizeof(type);\
+	cb(args);\
+	return sizeof(type);
+
 static int
 decode_field(struct zproto_args *args, zproto_cb_t cb)
 {
-	int sz;
 	len_t len;
-	switch (args->type) {
+	switch(args->type) {
 	case ZPROTO_BOOLEAN:
-		CHECK_VALID(args->buffsz, sizeof(uint8_t))
-		args->buffsz = sizeof(uint8_t);
-		return cb(args);
+		DECODE(uint8_t);
+	case ZPROTO_BYTE:
+		DECODE(int8_t);
+	case ZPROTO_SHORT:
+		DECODE(int16_t);
 	case ZPROTO_INTEGER:
+		DECODE(int32_t);
 	case ZPROTO_FLOAT:
-		CHECK_VALID(args->buffsz, sizeof(int32_t))
-		args->buffsz = sizeof(int32_t);
-		return cb(args);
+		DECODE(uint32_t);
 	case ZPROTO_LONG:
-		CHECK_VALID(args->buffsz, sizeof(int64_t))
-		args->buffsz = sizeof(int64_t);
-		return cb(args);
+		DECODE(int64_t);
+	case ZPROTO_BLOB:
 	case ZPROTO_STRING:
 		CHECK_VALID(args->buffsz, sizeof(len_t))
 		len = *(len_t *)args->buff;
@@ -1043,17 +1063,10 @@ decode_field(struct zproto_args *args, zproto_cb_t cb)
 		args->buffsz -= sizeof(len_t);
 		CHECK_VALID(args->buffsz, len)
 		args->buffsz = len;
-		sz = cb(args);
-		if (sz < 0)
-			return sz;
-		sz += sizeof(len_t);
-		return sz;
+		cb(args);
+		return len + sizeof(len_t);
 	case ZPROTO_STRUCT:
-		CHECK_VALID(args->buffsz, sizeof(hdr_t))
 		return cb(args);
-	default:
-		assert(!"unkown field type");
-		break;
 	}
 	return ZPROTO_ERROR;
 }
@@ -1104,8 +1117,7 @@ zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t
 	len_t total;
 	hdr_t len;
 	hdr_t *tag;
-	int	hdrsz;
-
+	int hdrsz;
 	CHECK_VALID(sz, sizeof(hdr_t) + sizeof(len_t))    //header size
 	last = st->basetag - 1; //tag now
 	total = *(len_t *)buff;
@@ -1121,7 +1133,6 @@ zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t
 	tag = (hdr_t *)buff;
 	buff += hdrsz;
 	sz -= hdrsz;
-
 	for (i = 0; i < len; i++) {
 		struct zproto_field *f;
 		struct zproto_args args;

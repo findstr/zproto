@@ -48,6 +48,18 @@ wire::_write(struct zproto_args *args, bool val) const
 }
 
 int
+wire::_write(struct zproto_args *args, int8_t val) const
+{
+	return write(args, val);
+}
+
+int
+wire::_write(struct zproto_args *args, int16_t val) const
+{
+	return write(args, val);
+}
+
+int
 wire::_write(struct zproto_args *args, int32_t val) const
 {
 	return write(args, val);
@@ -81,6 +93,18 @@ wire::_read(struct zproto_args *args, bool &val)
 	ret = read(args, b);
 	val = (b == 1) ? true : false;
 	return ret;
+}
+
+int
+wire::_read(struct zproto_args *args, int8_t &val)
+{
+	return read(args, val);
+}
+
+int
+wire::_read(struct zproto_args *args, int16_t &val)
+{
+	return read(args, val);
 }
 
 int

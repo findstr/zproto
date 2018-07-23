@@ -8,6 +8,9 @@ info 0xfd {
 	.age:float 6
 	.girl:boolean 9
 	.boy:boolean 10
+	.int8:byte 11
+	.int16:short 12
+	.blob:byte[] 13
 }
 
 packet 0xfe {
@@ -35,7 +38,10 @@ info 0xfd {
 	.age:float 6
 	.girl:boolean 9
 	.boy:boolean 10
-	.new:string[] 12
+	.int8:byte 11
+	.int16:short 12
+	.blob:byte[] 13
+	.new:string[] 18
 }
 
 packet 0xfe {
@@ -58,17 +64,17 @@ packet 0xfe {
 }
 ]]
 
-local proto = zproto:parse (protostr1)
-local newproto = zproto:parse(protostr2)
+local proto, err1 = zproto:parse (protostr1)
+local newproto, err2 = zproto:parse(protostr2)
 
-assert(proto)
-assert(newproto)
+assert(proto, err1)
+assert(newproto, err2)
 
 local packet = {
 	phone = {home=0x12345678abcf, work=654321, negwork = -654321},
 	info = {
-		["lucy"] = {name = "lucy", age = 18.3, girl = false, boy = true},
-		["lilei"] = {name="lilei", age = 24.5, girl = true, boy = false},
+		["lucy"] = {name = "lucy", age = 18.3, girl = false, boy = true, int8 = 127, int16 = 256, blob = "hello" },
+		["lilei"] = {name="lilei", age = 24.5, girl = true, boy = false, int8 = -128, int16 = -256, blob = "world"},
 	},
 	address = "China.shanghai",
 	luck = {1, -3, 9},
@@ -80,11 +86,12 @@ local packet = {
 }
 
 local function print_hex(dat)
+	local tbl = {}
 	local str = ""
 	for i = 1, #dat do
-		str = str .. string.format("%x ", dat:byte(i))
+		tbl[#tbl + 1] = string.format("%x ", dat:byte(i))
 	end
-	print(str)
+	print(table.concat(tbl))
 end
 
 local function round8(str)
@@ -117,6 +124,19 @@ local function test_eq(a, b)
 	end
 end
 
+local function test_abs_eq(a, b)
+	for k, v in pairs(a) do
+		local t = type(v)
+		if t == "table" then
+			test_eq(v, b[k])
+		elseif t == "number" then
+			assert(math.abs(v - b[k]) < 0.1, k)
+		else
+			assert(v == b[k], k)
+		end
+	end
+end
+
 --test proto
 local function testproto()
 	print("========begin test proto===========")
@@ -131,22 +151,18 @@ end
 local function testwire()
 	print("=========begin test wire=============")
 	print("+++++++source table")
-	local buf = {}
 	print("data", 1)
 	print(json.encode(packet))
 	print("data", 2)
 	local data = newproto:encode(0xfe, packet)
 	print("data", #data)
-	for i = 1, #data do
-		buf[#buf + 1] = string.format("%02x", data:byte(i))
-	end
-	print(table.concat(buf))
+	print_hex(data)
 	data = newproto:pack(data)
 	data = newproto:unpack(data)
 	local unpack = newproto:decode("packet", data)
 	print("------dest table", unpack)
 	print(json.encode(unpack))
-	test_eq(unpack, packet)
+	test_abs_eq(unpack, packet)
 	print("=========stop test wire=============")
 end
 

@@ -4,12 +4,17 @@
 #include <stdint.h>
 #include <setjmp.h>
 
-#define ZPROTO_BOOLEAN (1)
-#define ZPROTO_INTEGER (2)
-#define ZPROTO_LONG (3)
-#define ZPROTO_FLOAT (4)
-#define ZPROTO_STRING (5)
-#define ZPROTO_STRUCT (6)
+enum {
+	ZPROTO_BOOLEAN,
+	ZPROTO_BYTE,
+	ZPROTO_SHORT,
+	ZPROTO_INTEGER,
+	ZPROTO_LONG,
+	ZPROTO_FLOAT,
+	ZPROTO_STRING,
+	ZPROTO_BLOB,
+	ZPROTO_STRUCT,
+};
 
 #define ZPROTO_OOM (-1)
 #define ZPROTO_NOFIELD (-2)

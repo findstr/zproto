@@ -20,12 +20,16 @@ public:
 	virtual void _reset();
 protected:
 	int _write(struct zproto_args *args, bool val) const;
+	int _write(struct zproto_args *args, int8_t val) const;
+	int _write(struct zproto_args *args, int16_t val) const;
 	int _write(struct zproto_args *args, int32_t val) const;
 	int _write(struct zproto_args *args, int64_t val) const;
 	int _write(struct zproto_args *args, float val) const;
 	int _write(struct zproto_args *args, const std::string &val) const;
 
 	int _read(struct zproto_args *args, bool &val);
+	int _read(struct zproto_args *args, int8_t &val);
+	int _read(struct zproto_args *args, int16_t &val);
 	int _read(struct zproto_args *args, int32_t &val);
 	int _read(struct zproto_args *args, int64_t &val);
 	int _read(struct zproto_args *args, float &val);

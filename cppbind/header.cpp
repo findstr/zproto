@@ -141,11 +141,18 @@ find_field_type(struct zproto_args *args)
 	struct find_field_ud *ud = (struct find_field_ud *)args->ud;
 	if (ud->tag == args->tag) {
 		switch (args->type) {
+		case ZPROTO_BLOB:
 		case ZPROTO_STRING:
 			ud->type = "std::string";
 			break;
 		case ZPROTO_BOOLEAN:
 			ud->type = "bool";
+			break;
+		case ZPROTO_BYTE:
+			ud->type = "int8_t";
+			break;
+		case ZPROTO_SHORT:
+			ud->type = "int16_t";
 			break;
 		case ZPROTO_INTEGER:
 			ud->type = "int32_t";
@@ -191,6 +198,8 @@ prototype_cb(struct zproto_args *args)
 		case ZPROTO_BOOLEAN:
 			defval = " = false";
 			break;
+		case ZPROTO_BYTE:
+		case ZPROTO_SHORT:
 		case ZPROTO_LONG:
 		case ZPROTO_INTEGER:
 			defval = " = 0";
@@ -205,11 +214,18 @@ prototype_cb(struct zproto_args *args)
 	case ZPROTO_STRUCT:
 		subtype = std::string("struct ") + zproto_name(args->sttype);
 		break;
+	case ZPROTO_BLOB:
 	case ZPROTO_STRING:
 		subtype = "std::string";
 		break;
 	case ZPROTO_BOOLEAN:
 		subtype = "bool";
+		break;
+	case ZPROTO_BYTE:
+		subtype = "int8_t";
+		break;
+	case ZPROTO_SHORT:
+		subtype = "int16_t";
 		break;
 	case ZPROTO_INTEGER:
 		subtype = "int32_t";

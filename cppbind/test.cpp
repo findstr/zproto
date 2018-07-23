@@ -29,59 +29,61 @@ print_struct(const hello::world::packet &pk)
 	}
 	printf("packet::address:%s\n", pk.address.c_str());
 	printf("packet::bb:%s\n", pk.bb ? "true" : "false");
+	printf("packet::int8:%d\n", pk.int8);
+	printf("packet::int16:%d\n", pk.int16);
 	printf("packet::luck size:%lu\n", pk.luck.size());
 	for (size_t i = 0; i < pk.luck.size(); i++)
-		printf("%lld ", pk.luck[i]);
+		printf("%ld ", pk.luck[i]);
 	printf("\n");
 	for (const auto &iter:pk.address1)
 		printf("packet::address1 %s\n", iter.c_str());
 	printf("\n");
 }
 
-template<typename T> static void
-assert_map(T &a, T &b)
+static void
+assert_foo(const hello::world::packet::foo &a, const hello::world::packet::foo &b)
 {
-	for (const auto &iter:a) {
-		const auto &biter = b.find(iter.first);
-		assert(biter != b.end());
-		assert(iter.first == biter->first);
-		//assert(iter->second == biter->second);
-	};
+	assert(a.bar1 - b.bar1 < 0.0001f);
 }
 
-template<typename T> void
-assert_vector(T &a, T &b)
+static void
+assert_foo2(const hello::world::foo2 &a, const hello::world::foo2 &b)
 {
-	assert(a.size() == b.size());
-	for (size_t i = 0; i < a.size(); i++)
-		assert(a[i] == b[i]);
+	assert(a.bar2 == b.bar2);
 }
+
+static void
+assert_phone(const struct hello::world::packet::phone &a, const struct hello::world::packet::phone &b)
+{
+	assert(a.home == b.home);
+	assert(abs(a.work - b.work) < 0.0001f);
+	assert(a.main == b.main);
+	assert_foo(a.fooval, b.fooval);
+	assert_foo2(a.fooval2, b.fooval2);
+}
+
 static void
 assert_struct(const hello::world::packet &a, const hello::world::packet &b)
 {
 	for (const auto &iter:b.phone) {
 		const auto &aiter = a.phone.find(iter.second.home);
-		assert(aiter != a.phone.end());
-		assert(iter.second.home == aiter->second.home);
-		assert(iter.second.work - aiter->second.work < 0.0001);
-		assert(iter.second.home == aiter->second.home);
-	};
+		assert_phone(iter.second, aiter->second);
+	}
 	for (const auto &iter:b.phone2) {
 		const auto &aiter = a.phone2.find(iter.second.work);
 		assert(aiter != a.phone2.end());
-		assert(iter.second.home == aiter->second.home);
-		assert(iter.second.work - aiter->second.work < 0.0001);
-		assert(iter.second.home == aiter->second.home);
+		assert_phone(iter.second, aiter->second);
 	};
-
 	assert(a.address == b.address);
 	assert(a.luck == b.luck);
-	assert_vector(a.address1, b.address1);
+	assert(a.address1 == b.address1);
 	assert(a.ii == b.ii);
 	assert(a.ff == b.ff);
+	assert(a.ll == b.ll);
 	assert(a.bb == b.bb);
+	assert(a.int8 == b.int8);
+	assert(a.int16 == b.int16);
 }
-
 
 static void
 test_normal()
@@ -93,7 +95,7 @@ test_normal()
 	int datsize, cooksize;
 	hello::world::packet pk2;
 	hello::world::packet pk3;
-
+	hello::world::packet clr;
 	int sz = pk._serialize(dat);
 	printf("tag:%x\n", pk._tag());
 	printf("encode1 size:%d\n", sz);
@@ -101,7 +103,7 @@ test_normal()
 	sz = pk._pack((uint8_t *)dat.c_str(), dat.size(), cook);
 	printf("pack1 size:%d\n", sz);
 	print_hex((uint8_t *)cook.c_str(), cook.size());
-
+	//
 	datsize = pk._serialize(&datbuf);
 	printf("encode2 size:%d\n", datsize);
 	print_hex(datbuf, datsize);
@@ -109,28 +111,21 @@ test_normal()
 	printf("pack2 size:%d\n", cooksize);
 	print_hex(cookbuf, cooksize);
 	tmp.assign((char *)cookbuf, cooksize);
-
+	//
 	dat.clear();
 	pk2._unpack((uint8_t *)cook.c_str(), cook.size(), dat);
 	sz = pk2._parse(dat);
 	printf("decode1 size:%d\n", sz);
 	print_struct(pk2);
 	assert_struct(pk2, pk);
-
+	//
 	datsize = pk3._unpack((uint8_t *)tmp.c_str(), tmp.size(), &datbuf);
 	sz = pk3._parse(datbuf, datsize);
 	printf("decode2 size:%d\n", sz);
 	print_struct(pk3);
 	assert_struct(pk3, pk);
 	pk3._reset();
-	assert(pk3.phone.size() == 0);
-	assert(pk3.address.size() == 0);
-	assert(pk3.luck.size() == 0);
-	assert(pk3.address1.size() == 0);
-	assert(pk3.ii == 0);
-	assert(pk3.ff == 0.0f);
-	assert(pk3.ll == 0);
-	assert(pk3.bb == false);
+	assert_struct(pk3, clr);
 }
 
 static void *
@@ -177,6 +172,8 @@ int main()
 	pk.ff = 7.0f;
 	pk.ll = 8;
 	pk.bb = true;
+	pk.int8 = 127;
+	pk.int16 = 256;
 	test_normal();
 	pthread_create(&pid1, NULL, test_thread, NULL);
 	pthread_create(&pid2, NULL, test_thread, NULL);

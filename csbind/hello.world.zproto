@@ -10,6 +10,8 @@ packet 0xfe {
 	#english comment
 	foo {
 		.bar1:float 1
+		.int8:byte 2
+		.int16:short 3
 	}
 	phone {
 		.home:integer 1
@@ -19,7 +21,7 @@ packet 0xfe {
 	}
 	#中文注释
 	.phoneval:phone[] 1
-	.address:string 2
+	.address:byte[] 2
 	.luck:long[] 3
 	.address1:string[] 4
 	.fooval:foo2 5
