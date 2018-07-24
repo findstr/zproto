@@ -62,7 +62,7 @@ formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newa
 		nnewargs.level = newargs.level + 1;
 		formatst(z, child, nnewargs);
 		newargs.type.insert(newargs.type.end(),
-				nnewargs.fields.begin(), nnewargs.fields.end());
+			nnewargs.fields.begin(), nnewargs.fields.end());
 		++start;
 	}
 	zproto_travel(st, prototype_cb, &newargs);
@@ -260,14 +260,13 @@ static void
 dumpst(FILE *fp, struct zproto *z)
 {
 	int count;
-	struct prototype_args args;
 	struct zproto_struct *const* start, *const* end;
 	start = zproto_child(z, NULL, &count);
 	end = start + count;
 	while (start < end) {
+		struct prototype_args args;
 		struct zproto_struct *st = *start;
 		args.level = 1;
-		args.fields.clear();
 		formatst(z, st, args);
 		dump_vecstring(fp, args.fields);
 		++start;

@@ -1,4 +1,7 @@
 foo 0xf1 {
+	phone {
+
+	}
 	.bar:float 1
 }
 foo2 0xf3 {
