@@ -895,7 +895,7 @@ queryfield(struct zproto_struct *st, int tag)
 	if (sz < (int)(need))\
 		return ZPROTO_OOM;
 #define ENCODE(type) \
-	CHECK_OOM(args->buffsz, sizeof(type))\
+	CHECK_OOM(args->buffsz, sizeof(uint64_t))\
 	args->buffsz = sizeof(type);\
 	sz = cb(args);\
 	if (sz < 0)\

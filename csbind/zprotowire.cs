@@ -27,15 +27,15 @@ namespace zprotobuf
 			--oid;
 			uds[id] = null;
 		}
-		protected int write(ref zdll.args arg, string val) {
-			byte[] src = Encoding.ASCII.GetBytes(val);
-			return write(ref arg, src);
-		}
 		protected int write(ref zdll.args arg, byte[] src) {
 			if (src.Length > arg.buffsz)
 				return zdll.OOM;
 			Marshal.Copy(src, 0, arg.buff, src.Length);
 			return src.Length;
+		}
+		protected int write(ref zdll.args arg, string val) {
+			byte[] src = Encoding.ASCII.GetBytes(val);
+			return write(ref arg, src);
 		}
 		protected int write(ref zdll.args arg, bool val) {
 			byte[] src = BitConverter.GetBytes(val);
