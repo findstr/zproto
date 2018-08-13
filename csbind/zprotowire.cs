@@ -58,6 +58,23 @@ namespace zprotobuf
 			byte[] src = BitConverter.GetBytes(val);
 			return write(ref arg, src);
 		}
+		protected int write(ref zdll.args arg, byte val) {
+			byte[] src = new byte[1];
+			src[0] = (byte)val;
+			return write(ref arg, src);
+		}
+		protected int write(ref zdll.args arg, ushort val) {
+			byte[] src = BitConverter.GetBytes(val);
+			return write(ref arg, src);
+		}
+		protected int write(ref zdll.args arg, uint val) {
+			byte[] src = BitConverter.GetBytes(val);
+			return write(ref arg, src);
+		}
+		protected int write(ref zdll.args arg, ulong val) {
+			byte[] src = BitConverter.GetBytes(val);
+			return write(ref arg, src);
+		}
 		protected int write(ref zdll.args arg, float val) {
 			byte[] src = BitConverter.GetBytes(val);
 			return write(ref arg, src);
@@ -85,6 +102,22 @@ namespace zprotobuf
 		}
 		protected int read(ref zdll.args arg, out long val) {
 			val = BitConverter.ToInt64(read(ref arg), 0);
+			return arg.buffsz;
+		}
+		protected int read(ref zdll.args arg, out byte val) {
+			val = (byte)read(ref arg)[0];
+			return arg.buffsz;
+		}
+		protected int read(ref zdll.args arg, out ushort val) {
+			val = BitConverter.ToUInt16(read(ref arg), 0);
+			return arg.buffsz;
+		}
+		protected int read(ref zdll.args arg, out uint val) {
+			val = BitConverter.ToUInt32(read(ref arg), 0);
+			return arg.buffsz;
+		}
+		protected int read(ref zdll.args arg, out ulong val) {
+			val = BitConverter.ToUInt64(read(ref arg), 0);
 			return arg.buffsz;
 		}
 		protected int read(ref zdll.args arg, out float val) {

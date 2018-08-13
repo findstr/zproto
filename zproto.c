@@ -499,34 +499,35 @@ lex_uniquefield(struct lexstate *l, const char *name, int tag)
 
 static int
 lex_typeint(struct lexstate *l, struct lexstruct *node,
-		const char *type, struct zproto_struct **seminfo)
+	const char *type, struct zproto_struct **seminfo)
 {
-	int typen;
+	size_t i;
+	static struct {
+		const char *name;
+		int type;
+	} types[] = {
+		{"integer", ZPROTO_INTEGER},
+		{"uinteger", ZPROTO_UINTEGER},
+		{"long", ZPROTO_LONG},
+		{"ulong", ZPROTO_ULONG},
+		{"short", ZPROTO_SHORT},
+		{"ushort", ZPROTO_USHORT},
+		{"byte", ZPROTO_BYTE},
+		{"ubyte", ZPROTO_UBYTE},
+		{"string", ZPROTO_STRING},
+		{"blob", ZPROTO_BLOB},
+		{"boolean", ZPROTO_BOOLEAN},
+		{"float", ZPROTO_FLOAT},
+	};
 	*seminfo = NULL;
-	if (strcmp(type, "string") == 0) {
-		typen = ZPROTO_STRING;
-	} else if (strcmp(type, "integer") == 0) {
-		typen = ZPROTO_INTEGER;
-	} else if (strcmp(type, "long") == 0) {
-		typen = ZPROTO_LONG;
-	} else if (strcmp(type, "byte") == 0) {
-		typen = ZPROTO_BYTE;
-	} else if (strcmp(type, "short") == 0) {
-		typen = ZPROTO_SHORT;
-	} else if (strcmp(type, "float") == 0) {
-		typen = ZPROTO_FLOAT;
-	} else if (strcmp(type, "boolean") == 0) {
-		typen = ZPROTO_BOOLEAN;
-	} else if (strcmp(type, "blob") == 0) {
-		typen = ZPROTO_BLOB;
-	} else {
-		*seminfo = lex_findstruct(node, type);
-		if (*seminfo == NULL)
-			THROW(l, "nonexist struct '%s'\n", type);
-		typen = ZPROTO_STRUCT;
+	for (i = 0; i < sizeof(types)/sizeof(types[0]); i++) {
+		if (strcmp(type, types[i].name) == 0)
+			return types[i].type;
 	}
-	return typen;
-
+	*seminfo = lex_findstruct(node, type);
+	if (*seminfo == NULL)
+		THROW(l, "nonexist struct '%s'\n", type);
+	return ZPROTO_STRUCT;
 }
 
 #define NEXT_TOKEN(l, tk) lex_nexttoken(l, tk, NULL, 0)
@@ -564,8 +565,10 @@ lex_field(struct lexstate *l, struct lexstruct *node)
 			NEXT_STRING(l, mapkey);
 		} else {
 			mapkey[0] = 0;
-			if (type == ZPROTO_BYTE) //byte[] is blob type
+			if (type == ZPROTO_UBYTE) //ubyte[] is blob type
 				f->type = ZPROTO_BLOB;
+			else if (type == ZPROTO_BYTE) // byte[] is string byte
+				f->type = ZPROTO_STRING;
 		}
 		NEXT_TOKEN(l, ']');
 	} else {
@@ -910,16 +913,24 @@ encode_field(struct zproto_args *args, zproto_cb_t cb)
 	switch(args->type) {
 	case ZPROTO_BOOLEAN:
 		ENCODE(uint8_t);
+	case ZPROTO_FLOAT:
+		ENCODE(uint32_t);
 	case ZPROTO_BYTE:
 		ENCODE(int8_t);
 	case ZPROTO_SHORT:
 		ENCODE(int16_t);
 	case ZPROTO_INTEGER:
 		ENCODE(int32_t);
-	case ZPROTO_FLOAT:
-		ENCODE(uint32_t);
 	case ZPROTO_LONG:
 		ENCODE(int64_t);
+	case ZPROTO_UBYTE:
+		ENCODE(uint8_t);
+	case ZPROTO_USHORT:
+		ENCODE(uint16_t);
+	case ZPROTO_UINTEGER:
+		ENCODE(uint32_t);
+	case ZPROTO_ULONG:
+		ENCODE(uint64_t);
 	case ZPROTO_BLOB:
 	case ZPROTO_STRING:
 		CHECK_OOM(args->buffsz, sizeof(len_t))
@@ -1045,16 +1056,24 @@ decode_field(struct zproto_args *args, zproto_cb_t cb)
 	switch(args->type) {
 	case ZPROTO_BOOLEAN:
 		DECODE(uint8_t);
+	case ZPROTO_FLOAT:
+		DECODE(uint32_t);
 	case ZPROTO_BYTE:
 		DECODE(int8_t);
 	case ZPROTO_SHORT:
 		DECODE(int16_t);
 	case ZPROTO_INTEGER:
 		DECODE(int32_t);
-	case ZPROTO_FLOAT:
-		DECODE(uint32_t);
 	case ZPROTO_LONG:
 		DECODE(int64_t);
+	case ZPROTO_UBYTE:
+		DECODE(uint8_t);
+	case ZPROTO_USHORT:
+		DECODE(uint16_t);
+	case ZPROTO_UINTEGER:
+		DECODE(uint32_t);
+	case ZPROTO_ULONG:
+		DECODE(uint64_t);
 	case ZPROTO_BLOB:
 	case ZPROTO_STRING:
 		CHECK_VALID(args->buffsz, sizeof(len_t))

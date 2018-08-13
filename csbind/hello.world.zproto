@@ -12,6 +12,10 @@ packet 0xfe {
 		.bar1:float 1
 		.int8:byte 2
 		.int16:short 3
+		.uint8:ubyte 4
+		.uint16:ushort 5
+		.uint32:uinteger 6
+		.uint64:ulong 7
 	}
 	phone {
 		.home:integer 1
@@ -21,7 +25,7 @@ packet 0xfe {
 	}
 	#中文注释
 	.phoneval:phone[] 1
-	.address:byte[] 2
+	.address:ubyte[] 2
 	.luck:long[] 3
 	.address1:string[] 4
 	.fooval:foo2 5

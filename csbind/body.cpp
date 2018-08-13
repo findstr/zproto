@@ -302,6 +302,7 @@ formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 		nnewargs.level = newargs.level + 1;
 		assert(protocol.count(child) == 0);
 		assert(defined.count(child) == 0);
+		nnewargs.base = newargs.base + "." + zproto_name(child);
 		formatst(z, child, nnewargs);
 		newargs.stmts.insert(newargs.stmts.end(),
 			nnewargs.stmts.begin(),
@@ -402,6 +403,22 @@ prototype_cb(struct zproto_args *args)
 		break;
 	case ZPROTO_LONG:
 		subtype = "long";
+		goto gen;
+		break;
+	case ZPROTO_UBYTE:
+		subtype = "byte";
+		goto gen;
+		break;
+	case ZPROTO_USHORT:
+		subtype = "ushort";
+		goto gen;
+		break;
+	case ZPROTO_UINTEGER:
+		subtype = "uint";
+		goto gen;
+		break;
+	case ZPROTO_ULONG:
+		subtype = "ulong";
 		goto gen;
 		break;
 	case ZPROTO_FLOAT:

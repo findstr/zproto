@@ -83,6 +83,10 @@ reset_normal(struct zproto_args *args)
 		case ZPROTO_SHORT:
 		case ZPROTO_INTEGER:
 		case ZPROTO_LONG:
+		case ZPROTO_UBYTE:
+		case ZPROTO_USHORT:
+		case ZPROTO_UINTEGER:
+		case ZPROTO_ULONG:
 			fmt = "\t%s = 0;\n";
 			break;
 		case ZPROTO_FLOAT:
@@ -362,11 +366,15 @@ prototype_cb(struct zproto_args *args)
 	case ZPROTO_BLOB:
 	case ZPROTO_STRING:
 	case ZPROTO_BOOLEAN:
+	case ZPROTO_FLOAT:
 	case ZPROTO_BYTE:
 	case ZPROTO_SHORT:
 	case ZPROTO_INTEGER:
 	case ZPROTO_LONG:
-	case ZPROTO_FLOAT:
+	case ZPROTO_UBYTE:
+	case ZPROTO_USHORT:
+	case ZPROTO_UINTEGER:
+	case ZPROTO_ULONG:
 		estm = fill_normal(args);
 		dstm = to_normal(args);
 		rstm = reset_normal(args);

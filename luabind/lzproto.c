@@ -126,11 +126,14 @@ struct lencode_ud {
 	lua_State *L;
 };
 
-#define uint8(ptr)    (*(uint8_t *)ptr)
 #define int8(ptr)   (*(int8_t *)ptr)
 #define int16(ptr)   (*(int16_t *)ptr)
 #define int32(ptr)   (*(int32_t *)ptr)
 #define int64(ptr)   (*(int64_t *)ptr)
+#define uint8(ptr)   (*(uint8_t *)ptr)
+#define uint16(ptr)   (*(uint16_t *)ptr)
+#define uint32(ptr)   (*(uint32_t *)ptr)
+#define uint64(ptr)   (*(uint64_t *)ptr)
 #define float32(ptr)  (*(float *)ptr)
 
 #define CHECK_OOM(sz, need) \
@@ -181,6 +184,14 @@ encode_field(struct zproto_args *args)
 		ENCODE_INTEGER(int32);
 	case ZPROTO_LONG:
 		ENCODE_INTEGER(int64);
+	case ZPROTO_UBYTE:
+		ENCODE_INTEGER(uint8);
+	case ZPROTO_USHORT:
+		ENCODE_INTEGER(uint16);
+	case ZPROTO_UINTEGER:
+		ENCODE_INTEGER(uint32);
+	case ZPROTO_ULONG:
+		ENCODE_INTEGER(uint64);
 	case ZPROTO_FLOAT: {
 		checktype(LUA_TNUMBER);
 		lua_Number d = luaL_checknumber(L, -1);
@@ -355,6 +366,18 @@ decode_field(struct zproto_args *args)
 	case ZPROTO_LONG:
 		lua_pushinteger(L, int64(args->buff));
 		return sizeof(int64_t);
+	case ZPROTO_UBYTE:
+		lua_pushinteger(L, uint8(args->buff));
+		return sizeof(uint8_t);
+	case ZPROTO_USHORT:
+		lua_pushinteger(L, uint16(args->buff));
+		return sizeof(uint16_t);
+	case ZPROTO_UINTEGER:
+		lua_pushinteger(L, uint32(args->buff));
+		return sizeof(uint32_t);
+	case ZPROTO_ULONG:
+		lua_pushinteger(L, int64(args->buff));
+		return sizeof(uint64_t);
 	case ZPROTO_FLOAT:
 		lua_pushnumber(L, float32(args->buff));
 		return sizeof(uint32_t);

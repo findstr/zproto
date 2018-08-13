@@ -24,6 +24,10 @@ protected:
 	int _write(struct zproto_args *args, int16_t val) const;
 	int _write(struct zproto_args *args, int32_t val) const;
 	int _write(struct zproto_args *args, int64_t val) const;
+	int _write(struct zproto_args *args, uint8_t val) const;
+	int _write(struct zproto_args *args, uint16_t val) const;
+	int _write(struct zproto_args *args, uint32_t val) const;
+	int _write(struct zproto_args *args, uint64_t val) const;
 	int _write(struct zproto_args *args, float val) const;
 	int _write(struct zproto_args *args, const std::string &val) const;
 
@@ -32,6 +36,10 @@ protected:
 	int _read(struct zproto_args *args, int16_t &val);
 	int _read(struct zproto_args *args, int32_t &val);
 	int _read(struct zproto_args *args, int64_t &val);
+	int _read(struct zproto_args *args, uint8_t &val);
+	int _read(struct zproto_args *args, uint16_t &val);
+	int _read(struct zproto_args *args, uint32_t &val);
+	int _read(struct zproto_args *args, uint64_t &val);
 	int _read(struct zproto_args *args, float &val);
 	int _read(struct zproto_args *args, std::string &val);
 protected:

@@ -31,7 +31,10 @@ packet 0xfe {
 	.bb:boolean 9
 	.int8:byte 10
 	.int16:short 11
-
+	.ull:ulong 12
+	.uii:uinteger 15
+	.uint16:ushort 17
+	.uint8:ubyte 18
 }
 
 

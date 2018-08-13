@@ -135,39 +135,40 @@ struct find_field_ud {
 	std::string type;
 };
 
+static std::string
+typestr(int type, struct zproto_struct *st)
+{
+	static struct {
+		int type;
+		const char *name;
+	} types[] = {
+		{ZPROTO_BLOB, "std::string"},
+		{ZPROTO_STRING, "std::string"},
+		{ZPROTO_BOOLEAN, "bool"},
+		{ZPROTO_FLOAT, "float"},
+		{ZPROTO_BYTE, "int8_t"},
+		{ZPROTO_SHORT, "int16_t"},
+		{ZPROTO_INTEGER, "int32_t"},
+		{ZPROTO_LONG, "int64_t"},
+		{ZPROTO_UBYTE, "uint8_t"},
+		{ZPROTO_USHORT, "uint16_t"},
+		{ZPROTO_UINTEGER, "uint32_t"},
+		{ZPROTO_ULONG, "uint64_t"},
+	};
+	for (size_t i = 0; i < sizeof(types)/ sizeof(types[0]); i++) {
+		if (types[i].type == type)
+			return types[i].name;
+	}
+	assert(type == ZPROTO_STRUCT);
+	return std::string("struct ") + zproto_name(st);
+}
+
 static int
 find_field_type(struct zproto_args *args)
 {
 	struct find_field_ud *ud = (struct find_field_ud *)args->ud;
-	if (ud->tag == args->tag) {
-		switch (args->type) {
-		case ZPROTO_BLOB:
-		case ZPROTO_STRING:
-			ud->type = "std::string";
-			break;
-		case ZPROTO_BOOLEAN:
-			ud->type = "bool";
-			break;
-		case ZPROTO_BYTE:
-			ud->type = "int8_t";
-			break;
-		case ZPROTO_SHORT:
-			ud->type = "int16_t";
-			break;
-		case ZPROTO_INTEGER:
-			ud->type = "int32_t";
-			break;
-		case ZPROTO_LONG:
-			ud->type = "int64_t";
-			break;
-		case ZPROTO_FLOAT:
-			ud->type = "float";
-			break;
-		default:
-			assert(!"unsupport key type of std::map");
-			break;
-		}
-	}
+	if (ud->tag == args->tag)
+		ud->type = typestr(args->type, NULL);
 	return 0;
 }
 
@@ -202,6 +203,10 @@ prototype_cb(struct zproto_args *args)
 		case ZPROTO_SHORT:
 		case ZPROTO_LONG:
 		case ZPROTO_INTEGER:
+		case ZPROTO_UBYTE:
+		case ZPROTO_USHORT:
+		case ZPROTO_ULONG:
+		case ZPROTO_UINTEGER:
 			defval = " = 0";
 			break;
 		case ZPROTO_FLOAT:
@@ -209,36 +214,7 @@ prototype_cb(struct zproto_args *args)
 			break;
 		}
 	}
-
-	switch (args->type) {
-	case ZPROTO_STRUCT:
-		subtype = std::string("struct ") + zproto_name(args->sttype);
-		break;
-	case ZPROTO_BLOB:
-	case ZPROTO_STRING:
-		subtype = "std::string";
-		break;
-	case ZPROTO_BOOLEAN:
-		subtype = "bool";
-		break;
-	case ZPROTO_BYTE:
-		subtype = "int8_t";
-		break;
-	case ZPROTO_SHORT:
-		subtype = "int16_t";
-		break;
-	case ZPROTO_INTEGER:
-		subtype = "int32_t";
-		break;
-	case ZPROTO_LONG:
-		subtype = "int64_t";
-		break;
-	case ZPROTO_FLOAT:
-		subtype = "float";
-		break;
-	default:
-		break;
-	}
+	subtype = typestr(args->type, args->sttype);
 	snprintf(buff, 2048, type.c_str(), subtype.c_str(), args->name, defval.c_str());
 	ud->fields.push_back(buff);
 	if (iter.size()) {

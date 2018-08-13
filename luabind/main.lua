@@ -42,6 +42,10 @@ info 0xfd {
 	.int16:short 12
 	.blob:byte[] 13
 	.new:string[] 18
+	.uint8:ubyte 19
+	.uint16:ushort 20
+	.uint32:uinteger 21
+	.uint64:ulong 23
 }
 
 packet 0xfe {
@@ -73,7 +77,8 @@ assert(newproto, err2)
 local packet = {
 	phone = {home=0x12345678abcf, work=654321, negwork = -654321},
 	info = {
-		["lucy"] = {name = "lucy", age = 18.3, girl = false, boy = true, int8 = 127, int16 = 256, blob = "hello" },
+		["lucy"] = {name = "lucy", age = 18.3, girl = false, boy = true, int8 = 127, int16 = 256, blob = "hello",
+				uint8 = 255, uint16 = 65535, uint32 = 0xffffffff, uint64 = 0xffffffffffffffff},
 		["lilei"] = {name="lilei", age = 24.5, girl = true, boy = false, int8 = -128, int16 = -256, blob = "world"},
 	},
 	address = "China.shanghai",
@@ -124,19 +129,6 @@ local function test_eq(a, b)
 	end
 end
 
-local function test_abs_eq(a, b)
-	for k, v in pairs(a) do
-		local t = type(v)
-		if t == "table" then
-			test_eq(v, b[k])
-		elseif t == "number" then
-			assert(math.abs(v - b[k]) < 0.1, k)
-		else
-			assert(v == b[k], k)
-		end
-	end
-end
-
 --test proto
 local function testproto()
 	print("========begin test proto===========")
@@ -162,7 +154,8 @@ local function testwire()
 	local unpack = newproto:decode("packet", data)
 	print("------dest table", unpack)
 	print(json.encode(unpack))
-	test_abs_eq(unpack, packet)
+	test_eq(unpack, packet)
+	test_eq(packet, unpack)
 	print("=========stop test wire=============")
 end
 
