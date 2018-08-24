@@ -133,9 +133,14 @@ end
 local function testproto()
 	print("========begin test proto===========")
 	local tag = proto:tag("packet")
+	assert(tag == 0xfe, tag)
 	print("packet tag:", tag)
 	local tag = proto:tag("info")
+	assert(tag == 0xfd, tag)
 	print("info tag:", tag)
+	local tag = proto:tag("infox")
+	assert(tag == nil)
+	print("infox tag:", tag)
 	print("========stop test proto===========")
 end
 
@@ -159,11 +164,20 @@ local function testwire()
 	print("=========stop test wire=============")
 end
 
+local function testnonexist()
+	print("========begin test nonexist fault===========")
+	local ok, err = pcall(newproto.encode, newproto, 0xff, packet)
+	print("tesnonexist fault:", ok, err)
+	assert(not ok)
+	print("========stop test nonexist fault===========")
+end
+
 local function testarrayfault()
 	packet.empty = false
 	print("========begin test array fault===========")
 	local ok, err = pcall(newproto.encode, newproto, 0xfe, packet)
 	print("testarray fault:", ok, err)
+	assert(not ok)
 	print("========stop test array fault===========")
 	packet.empty = {}
 end
@@ -263,12 +277,12 @@ end
 
 testproto()
 testwire()
+testnonexist()
 testarrayfault()
 testcompatible("old", proto, newproto)
 testcompatible("new", newproto, proto)
 testpackunpack()
 testdecodedefend()
 testunpackdefend()
-
 proto = nil
 

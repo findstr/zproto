@@ -117,7 +117,6 @@ lquery(lua_State *L)
 		lua_pushlightuserdata(L, r);
 		lua_pushinteger(L, zproto_tag(r));
 	}
-
 	return 2;
 }
 
@@ -308,6 +307,8 @@ lencode(lua_State *L)
 	struct zproto_struct *st;
 	struct lencode_ud ud;
 	st = (struct zproto_struct *)lua_touserdata(L, 1);
+	if (st == NULL)
+		return luaL_error(L, "encode: 'struct' is null");
 	lua_checkstack(L, MAX_RECURSIVE * 3 + 8);
 	ud.level = 0;
 	ud.L = L;
@@ -495,6 +496,8 @@ ldecode(lua_State *L)
 	size_t datasz;
 	const uint8_t *data;
 	struct zproto_struct *st = lua_touserdata(L, 1);
+	if (st == NULL)
+		return luaL_error(L, "decode: 'struct' is null");
 	lua_checkstack(L, MAX_RECURSIVE * 3 + 8);
 	data = (uint8_t *)get_buffer(L, 2, &datasz);
 	lua_newtable(L);
