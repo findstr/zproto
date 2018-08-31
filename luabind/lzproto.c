@@ -11,16 +11,19 @@
 #define MAX_RECURSIVE (64)
 
 #if LUA_VERSION_NUM < 502
+
 #define lua_rawlen	lua_objlen
+
 #ifndef luaL_checkversion
 #define luaL_checkversion(L)	(void)0
 #endif
+
 #ifndef luaL_newlib
 #define luaL_newlib(L,l)  \
 	(luaL_checkversion(L),\
 	lua_createtable(L, 0, sizeof(l)/sizeof((l)[0]) - 1),\
 	luaL_setfuncs(L,l,0))
-/*
+	/*
 ** Copy from lua5.3
 ** set functions from list 'l' into table at top - 'nup'; each
 ** function gets the 'nup' elements at the top as upvalues.
@@ -40,6 +43,22 @@ luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
 	lua_pop(L, nup);  /* remove upvalues */
 }
 #endif
+
+#define lua_getfieldx(L, idx, k)	(lua_getfield(L, idx, k), lua_type(L, -1))
+
+LUALIB_API int
+lua_getix(lua_State *L, int i)
+{
+	lua_pushinteger(L, i);
+	lua_gettable(L, -2);
+	return lua_type(L, -1);
+}
+
+#else	// >= lua5.3
+
+#define lua_getfieldx			lua_getfield
+#define lua_getix(L, i)			lua_geti(L, -1, i)
+
 #endif
 
 static int
@@ -101,14 +120,15 @@ lquery(lua_State *L)
 {
 	struct zproto_struct *r = NULL;
 	struct zproto *z = zproto(L);
-	if (lua_type(L, 2) == LUA_TNUMBER) {
-		int tag = luaL_checkinteger(L, 2);
+	int type = lua_type(L, 2);
+	if (type == LUA_TNUMBER) {
+		int tag = lua_tointeger(L, 2);
 		r = zproto_querytag(z, tag);
-	} else if (lua_type(L, 2) == LUA_TSTRING) {
-		const char *name = luaL_checkstring(L, 2);
+	} else if (type == LUA_TSTRING) {
+		const char *name = lua_tostring(L, 2);
 		r = zproto_query(z, name);
 	} else {
-		luaL_error(L, "integer/string expected got:%d\n", lua_type(L, 2));
+		luaL_error(L, "integer/string expected got:%d\n", type);
 	}
 	if (r == NULL) {
 		lua_pushnil(L);
@@ -227,7 +247,7 @@ encode_array(struct zproto_args *args)
 	lua_State *L = eud->L;
 	if (args->idx == 0) {
 		int type;
-		type = lua_getfield(L, -1, args->name);
+		type = lua_getfieldx(L, -1, args->name);
 		if (type == LUA_TNIL) {
 			lua_pop(L, 1);
 			return ZPROTO_NOFIELD;
@@ -245,7 +265,7 @@ encode_array(struct zproto_args *args)
 		}
 	} else {
 		int type;
-		type = lua_geti(L, -1, args->idx + 1);
+		type = lua_getix(L, args->idx + 1);
 		if (type == LUA_TNIL) {
 			args->len = args->idx;
 			lua_pop(L, 2);
@@ -271,7 +291,7 @@ encode_table(struct zproto_args *args)
 	if (args->idx >= 0) {
 		sz = encode_array(args);
 	} else {
-		int type = lua_getfield(L, -1, args->name);
+		int type = lua_getfieldx(L, -1, args->name);
 		if (type == LUA_TNIL) {
 			lua_pop(L, 1);
 			return ZPROTO_NOFIELD;
