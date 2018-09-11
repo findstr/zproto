@@ -25,9 +25,6 @@
 	longjmp(l->exception, 1);\
 }
 
-typedef uint16_t hdr_t;
-typedef uint32_t len_t;
-
 struct zproto_field {
 	int tag;
 	int type;
@@ -894,55 +891,142 @@ queryfield(struct zproto_struct *st, int tag)
 	return NULL;
 }
 
+static inline int
+marshal_uint16(uint8_t *buff, uint32_t v)
+{
+	buff[0] = v & 0xff;
+	buff[1] = (v >> 8) & 0xff;
+	return 2;
+}
+
+static inline uint32_t
+unmarshal_uint16(const uint8_t *buff)
+{
+	return (buff[0] | (buff[1] << 8));
+}
+
+static inline int
+marshal_uint32(uint8_t *buff, uint32_t v)
+{
+	buff[0] = v & 0xff;
+	buff[1] = (v >> 8) & 0xff;
+	buff[2] = (v >> 16) & 0xff;
+	buff[3] = (v >> 24) & 0xff;
+	return 4;
+}
+
+static inline uint32_t
+unmarshal_uint32(const uint8_t *buff)
+{
+	return (buff[0] | (buff[1] << 8) | (buff[2] << 16) | (buff[3] << 24));
+}
+
+static inline int
+marshal_uint64(uint8_t *buff, uint64_t v)
+{
+	buff[0] = v & 0xff;
+	buff[1] = (v >> 8) & 0xff;
+	buff[2] = (v >> 16) & 0xff;
+	buff[3] = (v >> 24) & 0xff;
+	buff[4] = (v >> 32) & 0xff;
+	buff[5] = (v >> 40) & 0xff;
+	buff[6] = (v >> 48) & 0xff;
+	buff[7] = (v >> 56) & 0xff;
+	return 8;
+}
+
+static inline uint64_t
+unmarshal_uint64(const uint8_t *buff)
+{
+	uint64_t v;
+	v = unmarshal_uint32(buff + 4);
+	v <<= 32;
+	v |= unmarshal_uint32(buff);
+	return v;
+}
+
+
+#define SIZEOF_TAG	2
+#define SIZEOF_LEN	4
+
+static inline int
+marshal_tag(uint8_t *buff, uint32_t v)
+{
+	return marshal_uint16(buff, v);
+}
+
+static inline uint32_t
+unmarshal_tag(const uint8_t *buff)
+{
+	return unmarshal_uint16(buff);
+}
+
+static inline int
+marshal_len(uint8_t *buff, uint32_t v)
+{
+	return marshal_uint32(buff, v);
+}
+
+static inline uint32_t
+unmarshal_len(const uint8_t *buff)
+{
+	return unmarshal_uint32(buff);
+}
+
 #define CHECK_OOM(sz, need)\
 	if (sz < (int)(need))\
 		return ZPROTO_OOM;
-#define ENCODE(type) \
-	CHECK_OOM(args->buffsz, sizeof(uint64_t))\
-	args->buffsz = sizeof(type);\
+
+#define ENCODE_INTEGER(bit)\
+	args->buff = (uint8_t *)&u.u##bit;\
+	args->buffsz = sizeof(uint##bit##_t);\
 	sz = cb(args);\
 	if (sz < 0)\
 		return sz;\
-	return sizeof(type);
+	return marshal_uint##bit(buff, u.u##bit);
 
 static int
 encode_field(struct zproto_args *args, zproto_cb_t cb)
 {
 	int sz;
-	len_t *len;
+	uint8_t *buff;
+	union {
+		uint16_t u16;
+		uint32_t u32;
+		uint64_t u64;
+	} u;
+	CHECK_OOM(args->buffsz, sizeof(uint64_t));
+	buff = args->buff;
 	switch(args->type) {
 	case ZPROTO_BOOLEAN:
-		ENCODE(uint8_t);
-	case ZPROTO_FLOAT:
-		ENCODE(uint32_t);
 	case ZPROTO_BYTE:
-		ENCODE(int8_t);
-	case ZPROTO_SHORT:
-		ENCODE(int16_t);
-	case ZPROTO_INTEGER:
-		ENCODE(int32_t);
-	case ZPROTO_LONG:
-		ENCODE(int64_t);
 	case ZPROTO_UBYTE:
-		ENCODE(uint8_t);
-	case ZPROTO_USHORT:
-		ENCODE(uint16_t);
-	case ZPROTO_UINTEGER:
-		ENCODE(uint32_t);
-	case ZPROTO_ULONG:
-		ENCODE(uint64_t);
-	case ZPROTO_BLOB:
-	case ZPROTO_STRING:
-		CHECK_OOM(args->buffsz, sizeof(len_t))
-		len = (len_t *)args->buff;
-		args->buff += sizeof(len_t);
-		args->buffsz -= sizeof(len_t);
+		args->buffsz = sizeof(uint8_t);
 		sz = cb(args);
 		if (sz < 0)
 			return sz;
-		*len = sz;
-		sz += sizeof(len_t);
-		return sz;
+		return sizeof(uint8_t);
+	case ZPROTO_SHORT:
+	case ZPROTO_USHORT:
+		ENCODE_INTEGER(16)
+	case ZPROTO_INTEGER:
+	case ZPROTO_UINTEGER:
+		ENCODE_INTEGER(32)
+	case ZPROTO_LONG:
+	case ZPROTO_ULONG:
+		ENCODE_INTEGER(64)
+	case ZPROTO_FLOAT:
+		ENCODE_INTEGER(32)
+	case ZPROTO_BLOB:
+	case ZPROTO_STRING:
+		CHECK_OOM(args->buffsz, SIZEOF_LEN);
+		args->buff += SIZEOF_LEN;
+		args->buffsz -= SIZEOF_LEN;
+		sz = cb(args);
+		if (sz < 0)
+			return sz;
+		marshal_len(buff, sz);
+		return (SIZEOF_LEN + sz);
 	case ZPROTO_STRUCT:
 		return cb(args);
 	}
@@ -953,14 +1037,13 @@ static int
 encode_array(struct zproto_args *args, zproto_cb_t cb)
 {
 	int err;
-	len_t *len;
+	uint8_t *len, *buff;
 	int buffsz = args->buffsz;
-	uint8_t *buff = args->buff;
-	uint8_t *start = buff;
-	CHECK_OOM(buffsz, sizeof(len_t))
-	len = (len_t *)buff;
-	buff += sizeof(len_t);
-	buffsz -= sizeof(len_t);
+	CHECK_OOM(buffsz, SIZEOF_LEN);
+	buff = args->buff;
+	len = buff;
+	buff += SIZEOF_LEN;
+	buffsz -= SIZEOF_LEN;
 	args->idx = 0;
 	for (;;) {
 		args->buffsz = buffsz;
@@ -976,33 +1059,30 @@ encode_array(struct zproto_args *args, zproto_cb_t cb)
 		return err;
 	if (args->len == -1)	//if len is negtive, the array field nonexist
 		return ZPROTO_NOFIELD;
-	*len = args->idx;
-	return buff - start;
+	marshal_len(len, args->idx);
+	return buff - len;
 }
 
 
 int
 zproto_encode(struct zproto_struct *st, uint8_t *buff, int sz, zproto_cb_t cb, void *ud)
 {
-	int i;
-	int err;
-	len_t *total;
-	hdr_t *len;
-	hdr_t *tag;
-	uint8_t *body;
+	uint32_t datasize;
+	int i, err, lasttag;
 	struct zproto_field **fields;
-	int last = st->basetag - 1; //tag now
-	int fcnt = st->fieldcount; //field count
-	int hdrsz= (fcnt + 1) * sizeof(hdr_t) + sizeof(len_t);
+	uint8_t *len, *tagcount, *tag, *body;
+	int fieldcount = st->fieldcount; //field count
+	int hdrsz= SIZEOF_LEN + (fieldcount + 1) * SIZEOF_TAG;
 	CHECK_OOM(sz, hdrsz);
 	fields = st->fields;
-	total = (len_t *)buff;
-	len = (hdr_t *)(total + 1);
-	tag = len + 1;
+	len = buff;
+	tagcount = (len + SIZEOF_LEN);
+	tag = tagcount + SIZEOF_TAG;
 	buff += hdrsz;
 	sz -= hdrsz;
 	body = buff;
-	for (i = 0; i < fcnt; i++) {
+	lasttag = st->basetag - 1; //tag begin
+	for (i = 0; i < fieldcount ; i++) {
 		struct zproto_field *f;
 		struct zproto_args args;
 		f = fields[i];
@@ -1025,65 +1105,71 @@ zproto_encode(struct zproto_struct *st, uint8_t *buff, int sz, zproto_cb_t cb, v
 		assert(sz >= err);
 		buff += err;
 		sz -= err;
-		assert(f->tag >= last + 1);
-		*tag = (f->tag - last - 1);
-		tag++;
-		last = f->tag;
+		assert(f->tag >= lasttag + 1);
+		marshal_tag(tag, f->tag - lasttag - 1);
+		tag += SIZEOF_TAG;
+		lasttag = f->tag;
 	}
-	*len = (tag - len) - 1; //length used one byte
-	if ((uintptr_t)tag != (uintptr_t)body)
+	//length used one slot
+	marshal_tag(tagcount, (tag - tagcount) / SIZEOF_TAG - 1);
+	if (tag != body)
 		memmove(tag, body, buff - body);
-	*total = (buff - body) + ((uint8_t *)tag - (uint8_t *)len);
-	return sizeof(len_t) + *total;
+	datasize = (tag - tagcount) + (buff - body);
+	marshal_len(len, datasize);
+	return SIZEOF_LEN + datasize;
 }
-
 
 
 #define CHECK_VALID(sz, need)	\
 	if (sz < (int)(need))\
 		return ZPROTO_ERROR;
 
-#define DECODE(type)\
-	CHECK_VALID(args->buffsz, sizeof(type))\
-	args->buffsz = sizeof(type);\
+#define DECODE_INTEGER(bit)\
+	CHECK_VALID(args->buffsz, sizeof(uint##bit##_t))\
+	u.u##bit= unmarshal_uint##bit(args->buff);\
+	args->buff = (uint8_t *)&u.u##bit;\
+	args->buffsz = sizeof(uint##bit##_t);\
 	cb(args);\
-	return sizeof(type);
+	return sizeof(uint##bit##_t);
 
 static int
 decode_field(struct zproto_args *args, zproto_cb_t cb)
 {
-	len_t len;
+	uint32_t len;
+	union {
+		uint16_t u16;
+		uint32_t u32;
+		uint64_t u64;
+	} u;
 	switch(args->type) {
 	case ZPROTO_BOOLEAN:
-		DECODE(uint8_t);
-	case ZPROTO_FLOAT:
-		DECODE(uint32_t);
 	case ZPROTO_BYTE:
-		DECODE(int8_t);
-	case ZPROTO_SHORT:
-		DECODE(int16_t);
-	case ZPROTO_INTEGER:
-		DECODE(int32_t);
-	case ZPROTO_LONG:
-		DECODE(int64_t);
 	case ZPROTO_UBYTE:
-		DECODE(uint8_t);
+		CHECK_VALID(args->buffsz, sizeof(uint8_t));
+		args->buffsz = sizeof(uint8_t);
+		cb(args);
+		return sizeof(uint8_t);
+	case ZPROTO_SHORT:
 	case ZPROTO_USHORT:
-		DECODE(uint16_t);
+		DECODE_INTEGER(16)
+	case ZPROTO_INTEGER:
 	case ZPROTO_UINTEGER:
-		DECODE(uint32_t);
+		DECODE_INTEGER(32)
+	case ZPROTO_LONG:
 	case ZPROTO_ULONG:
-		DECODE(uint64_t);
+		DECODE_INTEGER(64)
+	case ZPROTO_FLOAT:
+		DECODE_INTEGER(32)
 	case ZPROTO_BLOB:
 	case ZPROTO_STRING:
-		CHECK_VALID(args->buffsz, sizeof(len_t))
-		len = *(len_t *)args->buff;
-		args->buff += sizeof(len_t);
-		args->buffsz -= sizeof(len_t);
+		CHECK_VALID(args->buffsz, SIZEOF_LEN);
+		len = unmarshal_len(args->buff);
+		args->buff += SIZEOF_LEN;
+		args->buffsz -= SIZEOF_LEN;
 		CHECK_VALID(args->buffsz, len)
 		args->buffsz = len;
 		cb(args);
-		return len + sizeof(len_t);
+		return SIZEOF_LEN + len;
 	case ZPROTO_STRUCT:
 		return cb(args);
 	}
@@ -1093,17 +1179,15 @@ decode_field(struct zproto_args *args, zproto_cb_t cb)
 static int
 decode_array(struct zproto_args *args, zproto_cb_t cb)
 {
-	int i;
-	int err;
-	int len;
-	uint8_t *buff;
+	int err, i, len;
 	uint8_t *start;
-	int buffsz;
-	CHECK_VALID(args->buffsz, sizeof(len_t))
-	start = args->buff;
-	len = *(len_t *)args->buff;
-	buff = args->buff + sizeof(len_t);
-	buffsz = args->buffsz - sizeof(len_t);
+	uint8_t *buff = args->buff;
+	int buffsz = args->buffsz;
+	CHECK_VALID(buffsz, SIZEOF_LEN);
+	start = buff;
+	len = unmarshal_len(buff);
+	buff += SIZEOF_LEN;
+	buffsz -= SIZEOF_LEN;
 	args->idx = 0;
 	args->len = len;
 	if (len == 0) { //empty array
@@ -1128,40 +1212,39 @@ decode_array(struct zproto_args *args, zproto_cb_t cb)
 }
 
 int
-zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t cb, void *ud)
+zproto_decode(struct zproto_struct *st,
+	const uint8_t *buff, int size,
+	zproto_cb_t cb, void *ud)
 {
-	int i;
-	int err;
-	int last;
-	len_t total;
-	hdr_t len;
-	hdr_t *tag;
-	int hdrsz;
-	CHECK_VALID(sz, sizeof(hdr_t) + sizeof(len_t))    //header size
-	last = st->basetag - 1; //tag now
-	total = *(len_t *)buff;
-	buff += sizeof(len_t);
-	sz -= sizeof(len_t);
-	CHECK_VALID(sz, total)
-	sz = total;
-	len = *(hdr_t *)buff;
-	buff += sizeof(hdr_t);
-	sz -=  sizeof(hdr_t);
-	hdrsz = len * sizeof(hdr_t);
-	CHECK_VALID(sz, hdrsz)
-	tag = (hdr_t *)buff;
-	buff += hdrsz;
-	sz -= hdrsz;
-	for (i = 0; i < len; i++) {
+	const uint8_t *tagptr;
+	int len, tagcount;
+	int headsize, i, err, lasttag;
+	CHECK_VALID(size, SIZEOF_LEN + SIZEOF_TAG) //header size
+	len = unmarshal_len(buff);
+	buff += SIZEOF_LEN;
+	size -= SIZEOF_LEN;
+	CHECK_VALID(size, len)
+	size = len;
+	tagcount = unmarshal_tag(buff);
+	buff += SIZEOF_TAG;
+	size -= SIZEOF_TAG;
+	headsize = SIZEOF_TAG * tagcount;
+	CHECK_VALID(size, headsize)
+	tagptr = buff;
+	buff += headsize;
+	size -= headsize;
+	lasttag = st->basetag - 1; //tag now
+	for (i = 0; i < tagcount; i++) {
 		struct zproto_field *f;
 		struct zproto_args args;
-		int t = *tag + last + 1;
+		int t = unmarshal_tag(tagptr);
+		t += lasttag + 1;
 		f = queryfield(st, t);
 		if (f == NULL)
 			break;
 		fill_args(&args, f, ud);
 		args.buff = (uint8_t *)buff;
-		args.buffsz = sz;
+		args.buffsz = size;
 		if (f->type & ZPROTO_ARRAY)
 			err = decode_array(&args, cb);
 		else
@@ -1170,11 +1253,11 @@ zproto_decode(struct zproto_struct *st, const uint8_t *buff, int sz, zproto_cb_t
 			return err;
 		assert(err > 0);
 		buff += err;
-		sz -= err;
-		tag++;
-		last = t;
+		size -= err;
+		lasttag = t;
+		tagptr += SIZEOF_TAG;
 	}
-	return total + sizeof(len_t);
+	return SIZEOF_LEN + len;
 }
 
 //////////encode/decode
