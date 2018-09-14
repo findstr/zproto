@@ -49,20 +49,26 @@ struct zproto_struct {
 };
 
 struct zproto {
-	struct chunk *chunk;
+	union chunk *chunk;
 	struct starray *root;
 	struct starray *namecache;
 	struct starray *tagcache;
 };
 
-struct chunk {
-	struct chunk *next;
+union alignment {
+	void *p;
+	int n;
+};
+
+union chunk {
+	union alignment _;
+	union chunk *next;
 };
 
 struct memory {
 	int size;
 	char *ptr;
-	struct chunk *chunk;
+	union chunk *chunk;
 };
 
 struct lexfieldbuf {
@@ -93,20 +99,22 @@ struct lexstate {
 	struct zproto_parser *p;
 };
 
+#define ALIGN_MASK	(sizeof(union alignment) - 1)
+
 static void *
 memory_alloc(struct memory *m, size_t sz)
 {
-	sz = (sz + 7) & (~7);	//align to 8 for performance
+	sz = (sz + ALIGN_MASK) & (~ALIGN_MASK); //align to 8 for performance
 	if (m->size < (int)sz) {
 		void *p;
 		int need;
-		struct chunk *chunk;
+		union chunk *chunk;
 		need = (sz + sizeof(*chunk));
 		if (need > CHUNK_SIZE)
 			need = ((need- 1) / CHUNK_SIZE + 1) * CHUNK_SIZE;
 		else
 			need = CHUNK_SIZE;
-		chunk = (struct chunk *)malloc(need);
+		chunk = (union chunk *)malloc(need);
 		need -= sizeof(*chunk);
 		chunk->next = m->chunk;
 		m->chunk = chunk;
@@ -133,9 +141,9 @@ memory_dupstr(struct memory *m, char *str)
 }
 
 static void
-memory_free(struct chunk *c)
+memory_free(union chunk *c)
 {
-	struct chunk *tmp;
+	union chunk *tmp;
 	while (c) {
 		tmp = c;
 		c = c->next;
