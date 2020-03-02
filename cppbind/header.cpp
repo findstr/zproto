@@ -33,10 +33,9 @@ static std::string
 tab(int level)
 {
 	std::string str;
-	level *= 8;
 	str.reserve(level);
 	for (int i = 0; i < level; i++)
-		str += " ";
+		str += "\t";
 	return str;
 }
 
