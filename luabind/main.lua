@@ -144,6 +144,164 @@ local function testproto()
 	print("========stop test proto===========")
 end
 
+--test default
+local function testdefault()
+	print("====begin test default============")
+	local p, err = zproto:parse [[
+		foo {
+			bar {
+				barc {
+					.i1:byte	1
+					.i2:short	2
+					.i3:integer	3
+					.i4:long	4
+					.u1:byte	5
+					.u2:short	6
+					.u3:integer	7
+					.u4:long	8
+					.f1:float	9
+					.f2:float	10
+					.f3:float	11
+					.f4:float	12
+					.i1a:byte[]	13
+					.i2a:short[]	14
+					.i3a:integer[]	15
+					.i4a:long[]	16
+					.u1a:byte[]	17
+					.u2a:short[]	18
+					.u3a:integer[]	19
+					.u4a:long[]	20
+					.f1a:float[]	21
+					.f2a:float[]	24
+					.f3a:float[]	28
+					.f4a:float[]	29
+				}
+				.f1:barc 1
+				.f2:barc 2
+			}
+			.i1:byte	1
+			.i2:short	2
+			.i3:integer	3
+			.i4:long	4
+			.u1:byte	5
+			.u2:short	6
+			.u3:integer	7
+			.u4:long	8
+			.f1:float	9
+			.f2:float	10
+			.f3:float	11
+			.f4:float	13
+			.i1a:byte[]	14
+			.i2a:short[]	17
+			.i3a:integer[]	19
+			.i4a:long[]	20
+			.u1a:byte[]	21
+			.u2a:short[]	22
+			.u3a:integer[]	23
+			.u4a:long[]	24
+			.f1a:float[]	25
+			.f2a:float[]	26
+			.f3a:float[]	27
+			.f4a:float[]	29
+			.bar:bar	36
+		}
+		barx {
+			.i1:byte	1
+			.i2:short	2
+			.i3:integer	3
+			.i4:long	4
+			.u1:byte	5
+			.u2:short	6
+			.u3:integer	7
+			.u4:long	8
+			.f1:float	9
+			.f2:float	10
+			.f3:float	11
+			.f4:float	12
+			.i1a:byte[]	13
+			.i2a:short[]	14
+			.i3a:integer[]	15
+			.i4a:long[]	16
+			.u1a:byte[]	17
+			.u2a:short[]	18
+			.u3a:integer[]	19
+			.u4a:long[]	20
+			.f1a:float[]	21
+			.f2a:float[]	22
+			.f3a:float[]	23
+			.f4a:float[]	24
+			.x1:byte	25
+			.x2:byte	26
+			.x3:byte	27
+			.x4:byte	28
+			.x5:byte	29
+			.x6:byte	30
+			.x7:byte	31
+			.x8:byte	32
+			.x9:byte	33
+			.x10:byte	34
+			.x11:byte	35
+			.x12:byte	36
+			.x13:byte	37
+			.x14:byte	38
+			.x15:byte	39
+			.x16:byte	40
+			.x17:byte	41
+			.x18:byte	42
+			.x19:byte	43
+			.x20:byte	44
+			.x22:byte	45
+			.x23:byte	46
+			.x24:byte	47
+			.x25:byte	48
+			.x26:byte	49
+			.x27:byte	50
+			.x28:byte	51
+			.x29:byte	52
+			.x30:byte	53
+			.x31:byte	54
+			.x32:byte	55
+			.x33:byte	56
+			.x34:byte	57
+			.x35:byte	58
+			.x36:byte	59
+			.x37:byte	60
+			.x38:byte	61
+			.x39:byte	62
+			.x40:byte	63
+			.x41:byte	64
+			.x42:byte	65
+		}
+	]]
+	print(p, err)
+	local obj = p:default("foo")
+	local check_default = function(obj)
+		for i = 1, 4 do
+			assert(obj['i'..i] == 0)
+			assert(#obj['i'..i..'a'] == 0)
+			assert(obj['u'..i] == 0)
+			assert(#obj['u'..i..'a'] == 0)
+			assert(math.abs(obj['f'..i] - 0.0) < 0.0001)
+			assert(#obj['f'..i .. 'a'] == 0)
+			if i == 1 then
+				assert(type(obj['u' .. i .. 'a']) == "string")
+				assert(type(obj['i' .. i .. 'a']) == "string")
+			else
+				assert(type(obj['u' .. i .. 'a']) == "table")
+				assert(type(obj['i' .. i .. 'a']) == "table")
+			end
+		end
+	end
+	print(json.encode(obj))
+	check_default(obj)
+	check_default(obj.bar.f1)
+	check_default(obj.bar.f2)
+	local x = p:default("barx")
+	print(x)
+	assert(x == nil)
+	print("====finish test default============")
+end
+
 --test encode/decode
 local function testwire()
 	print("=========begin test wire=============")
@@ -276,6 +434,7 @@ end
 --test unpack defend
 
 testproto()
+testdefault()
 testwire()
 testnonexist()
 testarrayfault()
@@ -285,4 +444,3 @@ testpackunpack()
 testdecodedefend()
 testunpackdefend()
 proto = nil
-

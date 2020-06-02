@@ -70,8 +70,7 @@ local function query(self, typ)
 end
 
 function zproto:encode(typ, packet, raw)
-	local record = query(self, typ)
-	return engine.encode(record, packet, raw)
+	return engine.encode(query(self, typ), packet, raw)
 end
 
 function zproto:tag(typ)
@@ -84,8 +83,11 @@ function zproto:tag(typ)
 end
 
 function zproto:decode(typ, data, sz)
-	local record = query(self, typ)
-	return engine.decode(record, data, sz)
+	return engine.decode(query(self, typ), data, sz)
+end
+
+function zproto:default(typ)
+	return engine.default(query(self, typ), data, sz)
 end
 
 function zproto:pack(data, sz, raw)
