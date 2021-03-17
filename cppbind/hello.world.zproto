@@ -35,6 +35,7 @@ packet 0xfe {
 	.uii:uinteger 15
 	.uint16:ushort 17
 	.uint8:ubyte 18
+	.args:byte 19
 }
 
 

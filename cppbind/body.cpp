@@ -22,16 +22,16 @@ fill_normal(struct zproto_args *args)
 	char buff[512];
 	const char *fmt =
 	"\tcase %d:\n"
-	"\t\treturn _write(args, %s);\n";
+	"\t\treturn _write(_args, %s);\n";
 
 	const char *afmt =
 	"\tcase %d:\n"
-	"\t\tassert(args->idx >= 0);\n"
-	"\t\tif (args->idx >= (int)%s.size()) {\n"
-	"\t\t\targs->len = args->idx;\n"
+	"\t\tassert(_args->idx >= 0);\n"
+	"\t\tif (_args->idx >= (int)%s.size()) {\n"
+	"\t\t\t_args->len = _args->idx;\n"
 	"\t\t\treturn ZPROTO_NOFIELD;\n"
 	"\t\t}\n"
-	"\t\treturn _write(args, %s[args->idx]);\n";
+	"\t\treturn _write(_args, %s[_args->idx]);\n";
 
 	if (args->idx >= 0)
 		snprintf(buff, 512, afmt, args->tag, args->name, args->name);
@@ -46,15 +46,15 @@ to_normal(struct zproto_args *args)
 	char buff[512];
 	const char *fmt =
 	"\tcase %d:\n"
-	"\t\treturn _read(args, %s);\n";
+	"\t\treturn _read(_args, %s);\n";
 
 	const char *afmt =
 	"\tcase %d:\n"
-	"\t\tassert(args->idx >= 0);\n"
-	"\t\tif (args->len == 0)\n"
+	"\t\tassert(_args->idx >= 0);\n"
+	"\t\tif (_args->len == 0)\n"
 	"\t\t\treturn 0;\n"
-	"\t\t%s.resize(args->idx + 1);\n"
-	"\t\treturn _read(args, %s[args->idx]);\n";
+	"\t\t%s.resize(_args->idx + 1);\n"
+	"\t\treturn _read(_args, %s[_args->idx]);\n";
 
 	if (args->idx >= 0)
 		snprintf(buff, 512, afmt, args->tag, args->name, args->name);
@@ -104,27 +104,27 @@ fill_struct(struct zproto_args *args)
 	char buff[1024];
 	const char *fmt =
 	"\tcase %d:\n"
-	"\t\treturn %s._encode(args->buff, args->buffsz, args->sttype);\n";
+	"\t\treturn %s._encode(_args->buff, _args->buffsz, _args->sttype);\n";
 
 	const char *afmt =
 	"\tcase %d:\n"
-	"\t\tif (args->idx >= (int)%s.size()) {\n"
-	"\t\t\targs->len = args->idx;\n"
+	"\t\tif (_args->idx >= (int)%s.size()) {\n"
+	"\t\t\t_args->len = _args->idx;\n"
 	"\t\t\treturn ZPROTO_NOFIELD;\n"
 	"\t\t}\n"
-	"\t\treturn %s[args->idx]._encode(args->buff, args->buffsz, args->sttype);\n";
+	"\t\treturn %s[_args->idx]._encode(_args->buff, _args->buffsz, _args->sttype);\n";
 
 	const char *mfmt =
 	"\tcase %d: {\n"
 	"\t\tint ret;\n"
-	"\t\tif (args->idx == 0) {\n"
+	"\t\tif (_args->idx == 0) {\n"
 	"\t\t\t_mapiterator.%s = %s.begin();\n"
 	"\t\t}\n"
 	"\t\tif (_mapiterator.%s == %s.end()) {\n"
-	"\t\t\targs->len = args->idx;\n"
+	"\t\t\t_args->len = _args->idx;\n"
 	"\t\t\treturn ZPROTO_NOFIELD;\n"
 	"\t\t}\n"
-	"\t\tret = _mapiterator.%s->second._encode(args->buff, args->buffsz, args->sttype);\n"
+	"\t\tret = _mapiterator.%s->second._encode(_args->buff, _args->buffsz, _args->sttype);\n"
 	"\t\t++_mapiterator.%s;\n"
 	"\t\treturn ret;}\n";
 
@@ -149,22 +149,22 @@ to_struct(struct zproto_args *args)
 	char buff[512];
 	const char *fmt =
 	"\tcase %d:\n"
-	"\t\treturn %s._decode(args->buff, args->buffsz, args->sttype);\n";
+	"\t\treturn %s._decode(_args->buff, _args->buffsz, _args->sttype);\n";
 	const char *afmt =
 	"\tcase %d:\n"
-	"\t\tassert(args->idx >= 0);\n"
-	"\t\tif (args->len == 0)\n"
+	"\t\tassert(_args->idx >= 0);\n"
+	"\t\tif (_args->len == 0)\n"
 	"\t\t\treturn 0;\n"
-	"\t\t%s.resize(args->idx + 1);\n"
-	"\t\treturn %s[args->idx]._decode(args->buff, args->buffsz, args->sttype);\n";
+	"\t\t%s.resize(_args->idx + 1);\n"
+	"\t\treturn %s[_args->idx]._decode(_args->buff, _args->buffsz, _args->sttype);\n";
 	const char *mfmt =
 	"\tcase %d: {\n"
 	"\t\tint ret;\n"
 	"\t\tstruct %s _tmp;\n"
-	"\t\tassert(args->idx >= 0);\n"
-	"\t\tif (args->len == 0)\n"
+	"\t\tassert(_args->idx >= 0);\n"
+	"\t\tif (_args->len == 0)\n"
 	"\t\treturn 0;\n"
-	"\t\tret = _tmp._decode(args->buff, args->buffsz, args->sttype);\n"
+	"\t\tret = _tmp._decode(_args->buff, _args->buffsz, _args->sttype);\n"
 	"\t\t%s[_tmp.%s] = std::move(_tmp);\n"
 	"\t\treturn ret;\n"
 	"\t}\n";
@@ -195,9 +195,9 @@ format_code(const char *base, const char *name, const char *qualifier)
 {
 	const char *fmt =
 	"int\n"
-	"%s::%s(struct zproto_args *args) %s\n"
+	"%s::%s(struct zproto_args *_args) %s\n"
 	"{\n"
-	"\tswitch (args->tag) {\n";
+	"\tswitch (_args->tag) {\n";
 
 	char buff[1024];
 	snprintf(buff, 1024, fmt, base, name, qualifier);
