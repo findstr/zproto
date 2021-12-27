@@ -705,7 +705,7 @@ setfuncs_withbuffer(lua_State *L, luaL_Reg tbl[])
 	}
 }
 
-int
+LUALIB_API int
 luaopen_zproto_c(lua_State *L)
 {
 	luaL_Reg tbl1[] = {
