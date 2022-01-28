@@ -363,7 +363,9 @@ local function testpackunpack()
 	local file3 = io.open("unpacked.dat", "w+")
 	]]--
 	local function testmode(n)
-		print(string.format("test mode%d start", n))
+		local format = string.format
+		print(format("test mode%d start", n))
+		io.stdout:write("\27[?25l")
 		for i = 1, testcount do
 			local origin = rand.rand(n)
 			local packed = proto:pack(origin)
@@ -378,7 +380,9 @@ local function testpackunpack()
 				print("fail")
 				return false
 			end
+			io.stdout:write(format("%d/%d\r", i, testcount))
 		end
+		io.stdout:write("\27[?25h")
 		print(string.format("test mode%d stop", n))
 		return true
 	end
