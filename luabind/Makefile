@@ -8,7 +8,7 @@ PLATS=linux macosx
 platform:
 	@echo "'make PLATFORM' where PLATFORM is one of these:"
 	@echo "$(PLATS)"
-CCFLAG = -I../ -Ilua53/ -g -Wall -Wextra
+CCFLAG = -I../ -Ilua/ -g -Wall -Wextra
 LDFLAG := -lm -ldl
 
 linux:LDFLAG += -Wl,-E -lrt
@@ -25,7 +25,7 @@ zproto.so:../zproto.c lzproto.c
 rand.so:lrand.c
 	$(CC) $(CCFLAG) $(SHARED) -o $@ $^
 test:main.c
-	$(CC) $(CCFLAG) -o test main.c lua53/liblua.a $(LDFLAG)
+	$(CC) $(CCFLAG) -o test main.c lua/liblua.a $(LDFLAG)
 
 clean:
 	-rm *.o
