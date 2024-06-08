@@ -27,7 +27,7 @@ static std::string tab(int n)
 }
 
 static std::string inline
-fill_normal(struct zproto_args *args, int level)
+fill_normal(struct zproto_field *f, int level)
 {
 	std::string t = tab(level);
 	char buff[512];
@@ -43,25 +43,25 @@ fill_normal(struct zproto_args *args, int level)
 	"%s\t\t\treturn zdll.NOFIELD;\n"
 	"%s\t\t}\n"
 	"%s\t\treturn write(ref args, %s[args.idx]);\n";
-	if (args->idx >= 0) {
+	if (f->isarray) {
 		snprintf(buff, 512, afmt,
-				t.c_str(),args->tag,
+				t.c_str(),f->tag,
 				t.c_str(),
-				t.c_str(),args->name,
+				t.c_str(),f->name,
 				t.c_str(),
 				t.c_str(),
 				t.c_str(),
-				t.c_str(),args->name);
+				t.c_str(),f->name);
 	} else {
 		snprintf(buff, 512, fmt,
-				t.c_str(), args->tag,
-				t.c_str(), args->name);
+				t.c_str(), f->tag,
+				t.c_str(), f->name);
 	}
 	return buff;
 }
 
 static std::string inline
-to_blob(struct zproto_args *args, int level)
+to_blob(struct zproto_field *f, int level)
 {
 	char buff[512];
 	const char *fmt =
@@ -77,24 +77,24 @@ to_blob(struct zproto_args *args, int level)
 	"%s\t\treturn read(ref args, out %s[args.idx]);\n";
 
 	std::string t = tab(level);
-	if (args->idx >= 0) {
+	if (f->isarray) {
 		snprintf(buff, 512, afmt,
-			t.c_str(), args->tag,
+			t.c_str(), f->tag,
 			t.c_str(),
-			t.c_str(), args->name,
+			t.c_str(), f->name,
 			t.c_str(),
 			t.c_str(),
-			t.c_str(), args->name);
+			t.c_str(), f->name);
 	} else {
 		snprintf(buff, 512, fmt,
-			t.c_str(), args->tag,
-			t.c_str(), args->name);
+			t.c_str(), f->tag,
+			t.c_str(), f->name);
 	}
 	return buff;
 }
 
 static std::string inline
-to_string(struct zproto_args *args, int level)
+to_string(struct zproto_field *f, int level)
 {
 	char buff[512];
 	const char *fmt =
@@ -110,18 +110,18 @@ to_string(struct zproto_args *args, int level)
 	"%s\t\treturn read(ref args, out %s[args.idx]);\n";
 
 	std::string t = tab(level);
-	if (args->idx >= 0) {
+	if (f->isarray) {
 		snprintf(buff, 512, afmt,
-			t.c_str(), args->tag,
+			t.c_str(), f->tag,
 			t.c_str(),
-			t.c_str(), args->name,
+			t.c_str(), f->name,
 			t.c_str(),
 			t.c_str(),
-			t.c_str(), args->name);
+			t.c_str(), f->name);
 	} else {
 		snprintf(buff, 512, fmt,
-			t.c_str(), args->tag,
-			t.c_str(), args->name);
+			t.c_str(), f->tag,
+			t.c_str(), f->name);
 	}
 	return buff;
 }
@@ -129,7 +129,7 @@ to_string(struct zproto_args *args, int level)
 
 
 static std::string inline
-to_normal(struct zproto_args *args, const char *type, int level)
+to_normal(struct zproto_field *f, const char *type, int level)
 {
 	char buff[512];
 	const char *fmt =
@@ -145,24 +145,24 @@ to_normal(struct zproto_args *args, const char *type, int level)
 	"%s\t\treturn read(ref args, out %s[args.idx]);\n";
 
 	std::string t = tab(level);
-	if (args->idx >= 0) {
+	if (f->isarray) {
 		snprintf(buff, 512, afmt,
-			t.c_str(), args->tag,
+			t.c_str(), f->tag,
 			t.c_str(),
-			t.c_str(), args->name, type,
+			t.c_str(), f->name, type,
 			t.c_str(),
 			t.c_str(),
-			t.c_str(), args->name);
+			t.c_str(), f->name);
 	} else {
 		snprintf(buff, 512, fmt,
-			t.c_str(), args->tag,
-			t.c_str(), args->name);
+			t.c_str(), f->tag,
+			t.c_str(), f->name);
 	}
 	return buff;
 }
 
 static std::string inline
-fill_struct(struct zproto_args *args, int level)
+fill_struct(struct zproto_field *f, int level)
 {
 	char buff[1024];
 	std::string t = tab(level);
@@ -179,26 +179,26 @@ fill_struct(struct zproto_args *args, int level)
 	"%s\tcase %d:\n"
 	"%s\t\treturn %s._encode(args.buff, args.buffsz, args.sttype);\n";
 
-	if (args->maptag) {
+	if (f->mapkey != NULL) {
 		assert(0);
-	} else if (args->idx >= 0) {
+	} else if (f->isarray) {
 		snprintf(buff, 1024, afmt,
-				t.c_str(), args->tag,
-				t.c_str(), args->name,
+				t.c_str(), f->tag,
+				t.c_str(), f->name,
 				t.c_str(),
 				t.c_str(),
 				t.c_str(),
-				t.c_str(), args->name);
+				t.c_str(), f->name);
 	} else {
 		snprintf(buff, 1024, fmt,
-				t.c_str(), args->tag,
-				t.c_str(), args->name);
+				t.c_str(), f->tag,
+				t.c_str(), f->name);
 	}
 	return buff;
 }
 
 static std::string inline
-to_struct(struct zproto_args *args, const char *type, int level)
+to_struct(struct zproto_field *f, const char *type, int level)
 {
 	char buff[512];
 
@@ -219,23 +219,23 @@ to_struct(struct zproto_args *args, const char *type, int level)
 
 	std::string t = tab(level);
 
-	if (args->maptag) {
+	if (f->mapkey != NULL) {
 		assert(0);
-	} else if (args->idx >= 0) {
+	} else if (f->isarray) {
 		snprintf(buff, 512, afmt,
-				t.c_str(), args->tag,
+				t.c_str(), f->tag,
 				t.c_str(),
 				t.c_str(),
-				t.c_str(), args->name, type,
+				t.c_str(), f->name, type,
 				t.c_str(),
 				t.c_str(),
-				t.c_str(), args->name, type,
-				t.c_str(), args->name);
+				t.c_str(), f->name, type,
+				t.c_str(), f->name);
 	} else {
 		snprintf(buff, 512, fmt,
-				t.c_str(), args->tag,
-				t.c_str(), args->name, type,
-				t.c_str(), args->name);
+				t.c_str(), f->tag,
+				t.c_str(), f->name, type,
+				t.c_str(), f->name);
 	}
 	return buff;
 }
@@ -282,7 +282,7 @@ format_name(const char *base, int level)
 	return buff;
 }
 
-static int prototype_cb(struct zproto_args *args);
+static void prototype_cb(struct zproto_field *f, struct stmt_args *ud);
 
 static void
 formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
@@ -293,24 +293,29 @@ formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 	std::string tmp;
 	char buff[4096];
 	int count;
+	const struct zproto_starray *sts;
 	struct zproto_struct *const*start, *const*end;
-	start = zproto_child(z, st, &count);
-	end = start + count;
-	while (start < end) {
-		struct zproto_struct *child = *start;
-		struct stmt_args nnewargs;
-		nnewargs.level = newargs.level + 1;
-		assert(protocol.count(child) == 0);
-		assert(defined.count(child) == 0);
-		nnewargs.base = newargs.base + "." + zproto_name(child);
-		formatst(z, child, nnewargs);
-		newargs.stmts.insert(newargs.stmts.end(),
-			nnewargs.stmts.begin(),
-			nnewargs.stmts.end());
-		++start;
+	sts = (st == NULL) ? zproto_root(z) : st->child;
+	if (sts != NULL) {
+		start = &sts->buf[0];
+		end = start + sts->count;
+		while (start < end) {
+			struct zproto_struct *child = *start;
+			struct stmt_args nnewargs;
+			nnewargs.level = newargs.level + 1;
+			assert(protocol.count(child) == 0);
+			assert(defined.count(child) == 0);
+			nnewargs.base = newargs.base + "." + zproto_name(child);
+			formatst(z, child, nnewargs);
+			newargs.stmts.insert(newargs.stmts.end(),
+				nnewargs.stmts.begin(),
+				nnewargs.stmts.end());
+			++start;
+		}
 	}
-	zproto_travel(st, prototype_cb, &newargs);
-
+	for (int i = 0; i < st->fieldcount; i++) {
+		prototype_cb(st->fields[i], &newargs);
+	}
 	//open
 	if (protocol.count(st)) {
 		snprintf(buff, 4096, "public class %s:wirep {\n",
@@ -352,38 +357,37 @@ formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 	return ;
 }
 
-static int
-prototype_cb(struct zproto_args *args)
+static void
+prototype_cb(struct zproto_field *f, struct stmt_args *ud)
 {
 	std::string estm;
 	std::string dstm;
 	std::string type;
 	std::string subtype;
 	char buff[2048];
-	struct stmt_args *ud = (struct stmt_args *)args->ud;
 	struct stmt_args newargs;
 	std::string t = tab(ud->level);
 	newargs.level = ud->level + 1;
-	if (args->idx >= 0)
+	if (f->isarray)
 		type = "public %s[] %s;\n";
 	else
 		type = "public %s %s;\n";
 
-	switch (args->type) {
+	switch (f->type) {
 	case ZPROTO_STRUCT:
-		subtype = zproto_name(args->sttype);
-		estm = fill_struct(args, ud->level);
-		dstm = to_struct(args, subtype.c_str(), ud->level);
+		subtype = zproto_name(f->seminfo);
+		estm = fill_struct(f, ud->level);
+		dstm = to_struct(f, subtype.c_str(), ud->level);
 		break;
 	case ZPROTO_BLOB:
 		subtype = "byte[]";
-		estm = fill_normal(args, ud->level);
-		dstm = to_blob(args, ud->level);
+		estm = fill_normal(f, ud->level);
+		dstm = to_blob(f, ud->level);
 		break;
 	case ZPROTO_STRING:
 		subtype = "string";
-		estm = fill_normal(args, ud->level);
-		dstm = to_string(args, ud->level);
+		estm = fill_normal(f, ud->level);
+		dstm = to_string(f, ud->level);
 		break;
 	case ZPROTO_BOOLEAN:
 		subtype = "bool";
@@ -424,8 +428,8 @@ prototype_cb(struct zproto_args *args)
 	case ZPROTO_FLOAT:
 		subtype = "float";
 	gen:
-		estm = fill_normal(args, ud->level);
-		dstm = to_normal(args, subtype.c_str(), ud->level);
+		estm = fill_normal(f, ud->level);
+		dstm = to_normal(f, subtype.c_str(), ud->level);
 		break;
 	default:
 		break;
@@ -433,11 +437,11 @@ prototype_cb(struct zproto_args *args)
 	snprintf(buff, 2048,
 		type.c_str(),
 		subtype.c_str(),
-		args->name);
+		f->name);
 	ud->fields.push_back(t + buff);
 	ud->encodestm.push_back(estm);
 	ud->decodestm.push_back(dstm);
-	return 0;
+	return ;
 }
 
 static void
@@ -453,8 +457,11 @@ dumpst(FILE *fp, struct zproto *z)
 {
 	int count;
 	struct zproto_struct *const* start, *const* end;
-	start = zproto_child(z, NULL, &count);
-	end = start + count;
+	const struct zproto_starray *sts = zproto_root(z);
+	if (sts == NULL)
+		return ;
+	start = &sts->buf[0];
+	end = start + sts->count;
 	while (start < end) {
 		struct stmt_args args;
 		struct zproto_struct *st = *start;
@@ -510,12 +517,15 @@ body(const char *name, std::vector<const char *> &space, const char *proto, stru
 	path += ".cs";
 	fp = fopen(path.c_str(), "wb+");
 
-	start = zproto_child(z, NULL, &count);
-	end = start + count;
-	while (start < end) {
-		struct zproto_struct *st = *start;
-		protocol.insert(st);
-		++start;
+	const struct zproto_starray *sts = zproto_root(z);
+	if (sts != NULL) {
+		start = &sts->buf[0];
+		end = start + sts->count;
+		while (start < end) {
+			struct zproto_struct *st = *start;
+			protocol.insert(st);
+			++start;
+		}
 	}
 	fprintf(fp,
 		"using System;\n"

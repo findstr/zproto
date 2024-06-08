@@ -39,7 +39,7 @@ tab(int level)
 	return str;
 }
 
-static int prototype_cb(struct zproto_args *args);
+static int prototype_cb(struct zproto_field *f, struct prototype_args &ud);
 
 static void
 formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newargs)
@@ -49,22 +49,27 @@ formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newa
 	std::string t2 = tab(newargs.level - 1);
 	std::string iterwrapper;
 	std::string iterdefine;
-	int count;
 	struct zproto_struct *const*start, *const*end;
-	start = zproto_child(z, st, &count);
-	end = start + count;
-	while (start < end) {
-		struct zproto_struct *child = *start;
-		assert(protocol.count(child) == 0);
-		assert(defined.count(child) == 0);
-		struct prototype_args nnewargs;
-		nnewargs.level = newargs.level + 1;
-		formatst(z, child, nnewargs);
-		newargs.type.insert(newargs.type.end(),
-			nnewargs.fields.begin(), nnewargs.fields.end());
-		++start;
+	const struct zproto_starray *sts;
+	sts = (st == NULL) ? zproto_root(z) : st->child;
+	if (sts != NULL) {
+		start = &sts->buf[0];
+		end = start + sts->count;
+		while (start < end) {
+			struct zproto_struct *child = *start;
+			assert(protocol.count(child) == 0);
+			assert(defined.count(child) == 0);
+			struct prototype_args nnewargs;
+			nnewargs.level = newargs.level + 1;
+			formatst(z, child, nnewargs);
+			newargs.type.insert(newargs.type.end(),
+				nnewargs.fields.begin(), nnewargs.fields.end());
+			++start;
+		}
 	}
-	zproto_travel(st, prototype_cb, &newargs);
+	for (int i = 0; i < st->fieldcount; i++) {
+		prototype_cb(st->fields[i], newargs);
+	}
 	//subtype
 	newargs.fields.insert(
 		newargs.fields.begin(),
@@ -163,38 +168,28 @@ typestr(int type, struct zproto_struct *st)
 }
 
 static int
-find_field_type(struct zproto_args *args)
+prototype_cb(struct zproto_field *f, struct prototype_args &ud)
 {
-	struct find_field_ud *ud = (struct find_field_ud *)args->ud;
-	if (ud->tag == args->tag)
-		ud->type = typestr(args->type, NULL);
-	return 0;
-}
-
-static int
-prototype_cb(struct zproto_args *args)
-{
-	struct prototype_args *ud = (struct prototype_args *)args->ud;
 	char buff[2048];
 	std::string type;
 	std::string iter;
 	std::string subtype;
 	std::string defval;
-	if (args->maptag) {
+	if (f->mapkey != NULL) {
 		std::string str;
-		assert(args->idx >= 0);
+		assert(f->isarray);
 		struct find_field_ud fud;
-		fud.tag = args->maptag;
-		zproto_travel(args->sttype, find_field_type, &fud);
+		fud.tag = f->mapkey->tag;
+		fud.type = typestr(f->mapkey->type, NULL);
 		assert(fud.type != "");
 		str = "std::unordered_map<" + fud.type + ", %s> %s%s;\n";
 		iter = "std::unordered_map<" + fud.type + ", %s>::const_iterator %s;\n";
-		type = tab(ud->level) + str;
-	} else if(args->idx >= 0) {
-		type = tab(ud->level) + "std::vector<%s> %s%s;\n";
+		type = tab(ud.level) + str;
+	} else if(f->isarray) {
+		type = tab(ud.level) + "std::vector<%s> %s%s;\n";
 	} else {
-		type = tab(ud->level) + "%s %s%s;\n";
-		switch (args->type) {
+		type = tab(ud.level) + "%s %s%s;\n";
+		switch (f->type) {
 		case ZPROTO_BOOLEAN:
 			defval = " = false";
 			break;
@@ -213,12 +208,12 @@ prototype_cb(struct zproto_args *args)
 			break;
 		}
 	}
-	subtype = typestr(args->type, args->sttype);
-	snprintf(buff, 2048, type.c_str(), subtype.c_str(), args->name, defval.c_str());
-	ud->fields.push_back(buff);
+	subtype = typestr(f->type, f->seminfo);
+	snprintf(buff, 2048, type.c_str(), subtype.c_str(), f->name, defval.c_str());
+	ud.fields.push_back(buff);
 	if (iter.size()) {
-		snprintf(buff, 2048, iter.c_str(), subtype.c_str(), args->name);
-		ud->iters.push_back(buff);
+		snprintf(buff, 2048, iter.c_str(), subtype.c_str(), f->name);
+		ud.iters.push_back(buff);
 	}
 	return 0;
 }
@@ -234,17 +229,20 @@ dump_vecstring(FILE *fp, const std::vector<std::string> &tbl)
 static void
 dumpst(FILE *fp, struct zproto *z)
 {
-	int count;
 	struct zproto_struct *const* start, *const* end;
-	start = zproto_child(z, NULL, &count);
-	end = start + count;
-	while (start < end) {
-		struct prototype_args args;
-		struct zproto_struct *st = *start;
-		args.level = 1;
-		formatst(z, st, args);
-		dump_vecstring(fp, args.fields);
-		++start;
+	const struct zproto_starray *sts;
+	sts = zproto_root(z);
+	if (sts != NULL) {
+		start = &sts->buf[0];
+		end = start + sts->count;
+		while (start < end) {
+			struct prototype_args args;
+			struct zproto_struct *st = *start;
+			args.level = 1;
+			formatst(z, st, args);
+			dump_vecstring(fp, args.fields);
+			++start;
+		}
 	}
 }
 
@@ -268,16 +266,19 @@ void
 header(const char *name, std::vector<const char *> &space, struct zproto *z)
 {
 	FILE *fp;
-	int count;
 	struct zproto_struct *const* start, *const* end;
 	std::string path = name;
 	path += ".hpp";
-	start = zproto_child(z, NULL, &count);
-	end = start + count;
-	while (start < end) {
-		struct zproto_struct *st = *start;
-		protocol.insert(st);
-		++start;
+	const struct zproto_starray *sts;
+	sts = zproto_root(z);
+	if (sts != NULL) {
+		start = &sts->buf[0];
+		end = start + sts->count;
+		while (start < end) {
+			struct zproto_struct *st = *start;
+			protocol.insert(st);
+			++start;
+		}
 	}
 	fp = fopen(path.c_str(), "wb+");
 	fprintf(fp, "#ifndef __%s_h\n#define __%s_h\n", name, name);

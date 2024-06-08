@@ -144,6 +144,31 @@ local function testproto()
 	print("========stop test proto===========")
 end
 
+local function testtravel()
+	local n = 0
+	for i, name, st in proto:travel("struct") do
+		n = n + 1
+		print(i, name, st)
+	end
+	assert(n == 2)
+	n = 0
+	for i, name, st in proto:travel("struct", "info") do
+		n = n + 1
+	end
+	assert(n == 0)
+	n = 0
+	for i, name, st in proto:travel("struct", "packet") do
+		n = n + 1
+		print(i, name, st)
+	end
+	assert(n == 2)
+
+	for i, field in proto:travel("field", "packet") do
+		print(i, json.encode(field))
+	end
+
+end
+
 --test default
 local function testdefault()
 	print("====begin test default============")
@@ -438,6 +463,7 @@ end
 --test unpack defend
 
 testproto()
+testtravel()
 testdefault()
 testwire()
 testnonexist()

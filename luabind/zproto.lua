@@ -14,7 +14,7 @@ local indexmt = {
 
 
 
-local function create(self, proto)
+local function create(proto)
 	local t = {
 		ncache = {}, -- name cache
 		tcache = {}, -- tag cache
@@ -33,7 +33,7 @@ function zproto:load(path)
 	if not proto then
 		return nil, err
 	end
-	return create(self, proto)
+	return create(proto)
 end
 
 function zproto:parse(str)
@@ -41,7 +41,7 @@ function zproto:parse(str)
 	if not proto then
 		return nil, err
 	end
-	return create(self, proto)
+	return create(proto)
 end
 
 local function query(self, typ)
@@ -87,7 +87,15 @@ function zproto:decode(typ, data, sz)
 end
 
 function zproto:default(typ)
-	return engine.default(query(self, typ), data, sz)
+	return engine.default(query(self, typ))
+end
+
+function zproto:travel(mod, typ)
+	if typ then
+		return engine.travel(self.proto, mod, query(self, typ))
+	else
+		return engine.travel(self.proto, mod, nil)
+	end
 end
 
 function zproto:pack(data, sz, raw)
