@@ -1,6 +1,7 @@
 local zproto = require "zproto"
 local json = require "json"
 local rand = require "rand"
+local format = string.format
 
 local protostr1 = [[
 info 0xfd {
@@ -133,8 +134,11 @@ end
 local function testproto()
 	print("========begin test proto===========")
 	local tag = proto:tag("packet")
-	assert(tag == 0xfe, tag)
 	print("packet tag:", tag)
+	assert(tag == 0xfe, tag)
+	local name = proto:tag(tag)
+	print("packet name:", name)
+	assert(name == "packet")
 	local tag = proto:tag("info")
 	assert(tag == 0xfd, tag)
 	print("info tag:", tag)
@@ -388,7 +392,6 @@ local function testpackunpack()
 	local file3 = io.open("unpacked.dat", "w+")
 	]]--
 	local function testmode(n)
-		local format = string.format
 		print(format("test mode%d start", n))
 		io.stdout:write("\27[?25l")
 		for i = 1, testcount do
@@ -420,12 +423,14 @@ local function testpackunpack()
 		local pack = zproto:pack(dat)
 		local unpack = zproto:unpack(pack)
 		assert(unpack == round8(dat))
-		print("pack", n,  "data:", #pack)
+		io.stdout:write(format("pack/data:%d/%d\r", n, #pack))
 		return #pack
 	end
+	io.stdout:write("\27[?25l")
 	for i = 1, 8191 do
 		assert(testsize(i) <= i + (i + 2047) // 2048 * 2 + 1)
 	end
+	io.stdout:write("\27[?25h")
 	if not testmode(0) then
 		return
 	end
@@ -439,21 +444,28 @@ local function testpackunpack()
 	print("========stop pack/unpack============")
 end
 
+local progress = {"x", "-", "."}
 local function testdecodedefend()
 	print("=======start decode defend==========")
+	io.stdout:write("\27[?25l")
 	for i = 1, testcount do
 		local dat = rand.rand(0)
 		proto:decode("packet", dat)
+		io.stdout:write(format("%s\r", progress[i % #progress + 1]))
 	end
+	io.stdout:write("\27[?25l")
 	print("=======stop decode defend===========")
 end
 
 local function testunpackdefend()
 	print("======start unpack defend===========")
+	io.stdout:write("\27[?25l")
 	for i = 1, testcount do
 		local dat = rand.rand(0)
 		proto:unpack(dat)
+		io.stdout:write(format("%s\r", progress[i % #progress + 1]))
 	end
+	io.stdout:write("\27[?25l")
 	print("======start unpack defend===========")
 end
 
