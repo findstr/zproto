@@ -7,7 +7,6 @@
 
 static std::unordered_set<struct zproto_struct *>	protocol;
 static std::unordered_set<struct zproto_struct *>	defined;
-static std::vector<std::string> querystmts;
 struct stmt_args {
 	std::string base;
 	std::vector<std::string> encodestm;
@@ -16,51 +15,266 @@ struct stmt_args {
 	std::vector<std::string> stmts;
 };
 
-static std::string inline
-fill_normal(struct zproto_field *f)
+// map a scalar type id to its encoder write method name
+static const char *
+wmethod(int type)
 {
-	char buff[512];
-	const char *fmt =
-	"\tcase %d:\n"
-	"\t\treturn _write(_args, %s);\n";
-
-	const char *afmt =
-	"\tcase %d:\n"
-	"\t\tassert(_args->idx >= 0);\n"
-	"\t\tif (_args->idx >= (int)%s.size()) {\n"
-	"\t\t\t_args->len = _args->idx;\n"
-	"\t\t\treturn ZPROTO_NOFIELD;\n"
-	"\t\t}\n"
-	"\t\treturn _write(_args, %s[_args->idx]);\n";
-
-	if (f->isarray)
-		snprintf(buff, 512, afmt, f->tag, f->name, f->name);
-	else
-		snprintf(buff, 512, fmt, f->tag, f->name);
-	return buff;
+	switch (type) {
+	case ZPROTO_BOOLEAN:
+	case ZPROTO_BYTE:
+	case ZPROTO_UBYTE:
+		return "w_u8";
+	case ZPROTO_SHORT:
+	case ZPROTO_USHORT:
+		return "w_u16";
+	case ZPROTO_INTEGER:
+	case ZPROTO_UINTEGER:
+		return "w_u32";
+	case ZPROTO_LONG:
+	case ZPROTO_ULONG:
+		return "w_u64";
+	case ZPROTO_FLOAT:
+		return "w_f32";
+	default:
+		assert(0);
+		return NULL;
+	}
 }
 
-static std::string inline
-to_normal(struct zproto_field *f)
+// map a scalar type id to its decoder read method name
+static const char *
+rmethod(int type)
 {
-	char buff[512];
-	const char *fmt =
-	"\tcase %d:\n"
-	"\t\treturn _read(_args, %s);\n";
+	switch (type) {
+	case ZPROTO_BOOLEAN:
+	case ZPROTO_BYTE:
+	case ZPROTO_UBYTE:
+		return "r_u8";
+	case ZPROTO_SHORT:
+	case ZPROTO_USHORT:
+		return "r_u16";
+	case ZPROTO_INTEGER:
+	case ZPROTO_UINTEGER:
+		return "r_u32";
+	case ZPROTO_LONG:
+	case ZPROTO_ULONG:
+		return "r_u64";
+	case ZPROTO_FLOAT:
+		return "r_f32";
+	default:
+		assert(0);
+		return NULL;
+	}
+}
 
-	const char *afmt =
-	"\tcase %d:\n"
-	"\t\tassert(_args->idx >= 0);\n"
-	"\t\tif (_args->len == 0)\n"
-	"\t\t\treturn 0;\n"
-	"\t\t%s.resize(_args->idx + 1);\n"
-	"\t\treturn _read(_args, %s[_args->idx]);\n";
+// the (T) cast wrapper applied to the value when encoding a scalar.
+// signedness is irrelevant on the wire: the cast reinterprets the bit
+// pattern into the unsigned width the encoder expects.
+static const char *
+ecast(int type)
+{
+	switch (type) {
+	case ZPROTO_BOOLEAN:	return "(uint8_t)";
+	case ZPROTO_BYTE:	return "(uint8_t)";
+	case ZPROTO_UBYTE:	return "(uint8_t)";
+	case ZPROTO_SHORT:	return "(uint16_t)";
+	case ZPROTO_USHORT:	return "(uint16_t)";
+	case ZPROTO_INTEGER:	return "(uint32_t)";
+	case ZPROTO_UINTEGER:	return "(uint32_t)";
+	case ZPROTO_LONG:	return "(uint64_t)";
+	case ZPROTO_ULONG:	return "(uint64_t)";
+	case ZPROTO_FLOAT:	return "";
+	default:
+		assert(0);
+		return "";
+	}
+}
 
-	if (f->isarray)
-		snprintf(buff, 512, afmt, f->tag, f->name, f->name);
-	else
-		snprintf(buff, 512, fmt, f->tag, f->name);
-	return buff;
+// the (T) cast applied to the decoder's unsigned read result so it
+// assigns back into the (possibly signed) member with the same bits.
+static const char *
+dcast(int type)
+{
+	switch (type) {
+	case ZPROTO_BOOLEAN:	return "";	// handled specially: == 1
+	case ZPROTO_BYTE:	return "(int8_t)";
+	case ZPROTO_UBYTE:	return "";
+	case ZPROTO_SHORT:	return "(int16_t)";
+	case ZPROTO_USHORT:	return "";
+	case ZPROTO_INTEGER:	return "(int32_t)";
+	case ZPROTO_UINTEGER:	return "";
+	case ZPROTO_LONG:	return "(int64_t)";
+	case ZPROTO_ULONG:	return "";
+	case ZPROTO_FLOAT:	return "";
+	default:
+		assert(0);
+		return "";
+	}
+}
+
+// returns the encode statement(s) for one field, emitted in
+// declaration order. Drives the schema-agnostic encoder directly.
+static std::string
+encode_stmt(struct zproto_field *f)
+{
+	char b[1024];
+	if (f->mapkey) {                         // struct map: array of struct values
+		snprintf(b, sizeof(b),
+			"\te.present(%d);\n"
+			"\te.w_array((uint32_t)this->%s.size());\n"
+			"\tfor (auto &kv : this->%s) {\n"
+			"\t\tkv.second._encode(out);\n"
+			"\t}\n",
+			f->tag, f->name, f->name);
+	} else if (f->type == ZPROTO_STRUCT && f->isarray) {
+		snprintf(b, sizeof(b),
+			"\te.present(%d);\n"
+			"\te.w_array((uint32_t)this->%s.size());\n"
+			"\tfor (auto &v : this->%s) {\n"
+			"\t\tv._encode(out);\n"
+			"\t}\n",
+			f->tag, f->name, f->name);
+	} else if (f->type == ZPROTO_STRUCT) {
+		snprintf(b, sizeof(b),
+			"\te.present(%d);\n"
+			"\tthis->%s._encode(out);\n",
+			f->tag, f->name);
+	} else if ((f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) && f->isarray) {
+		snprintf(b, sizeof(b),
+			"\te.present(%d);\n"
+			"\te.w_array((uint32_t)this->%s.size());\n"
+			"\tfor (auto &v : this->%s) {\n"
+			"\t\te.w_bytes(v.data(), v.size());\n"
+			"\t}\n",
+			f->tag, f->name, f->name);
+	} else if (f->isarray) {
+		const char *w = wmethod(f->type);
+		const char *c = ecast(f->type);
+		snprintf(b, sizeof(b),
+			"\te.present(%d);\n"
+			"\te.w_array((uint32_t)this->%s.size());\n"
+			"\tfor (auto &v : this->%s) {\n"
+			"\t\te.%s(%sv);\n"
+			"\t}\n",
+			f->tag, f->name, f->name, w, c);
+	} else if (f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) {
+		snprintf(b, sizeof(b),
+			"\te.present(%d);\n"
+			"\te.w_bytes(this->%s.data(), this->%s.size());\n",
+			f->tag, f->name, f->name);
+	} else {
+		const char *w = wmethod(f->type);
+		const char *c = ecast(f->type);
+		snprintf(b, sizeof(b),
+			"\te.present(%d);\n"
+			"\te.%s(%sthis->%s);\n",
+			f->tag, w, c, f->name);
+	}
+	return b;
+}
+
+
+// returns the "case TAG: ...; break;" decode statement for one field.
+// Mirrors the reference shape: scalar / array / string / struct / map.
+static std::string
+decode_stmt(struct zproto_field *f)
+{
+	char b[1024];
+	if (f->mapkey) {                         // struct map
+		snprintf(b, sizeof(b),
+			"\t\tcase %d: {\n"
+			"\t\t\tuint32_t c = d.r_array();\n"
+			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
+			"\t\t\t\tsize_t n;\n"
+			"\t\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
+			"\t\t\t\tstruct %s t;\n"
+			"\t\t\t\tt._decode(p, n);\n"
+			"\t\t\t\tthis->%s[t.%s] = std::move(t);\n"
+			"\t\t\t}\n"
+			"\t\t\tbreak;\n"
+			"\t\t}\n",
+			f->tag, zproto_name(f->seminfo), f->name, f->mapkey->name);
+	} else if (f->type == ZPROTO_STRUCT && f->isarray) {
+		snprintf(b, sizeof(b),
+			"\t\tcase %d: {\n"
+			"\t\t\tuint32_t c = d.r_array();\n"
+			"\t\t\tthis->%s.resize(c);\n"
+			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
+			"\t\t\t\tsize_t n;\n"
+			"\t\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
+			"\t\t\t\tthis->%s[i]._decode(p, n);\n"
+			"\t\t\t}\n"
+			"\t\t\tbreak;\n"
+			"\t\t}\n",
+			f->tag, f->name, f->name);
+	} else if (f->type == ZPROTO_STRUCT) {
+		snprintf(b, sizeof(b),
+			"\t\tcase %d: {\n"
+			"\t\t\tsize_t n;\n"
+			"\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
+			"\t\t\tthis->%s._decode(p, n);\n"
+			"\t\t\tbreak;\n"
+			"\t\t}\n",
+			f->tag, f->name);
+	} else if ((f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) && f->isarray) {
+		snprintf(b, sizeof(b),
+			"\t\tcase %d: {\n"
+			"\t\t\tuint32_t c = d.r_array();\n"
+			"\t\t\tthis->%s.resize(c);\n"
+			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
+			"\t\t\t\td.r_bytes(this->%s[i]);\n"
+			"\t\t\t}\n"
+			"\t\t\tbreak;\n"
+			"\t\t}\n",
+			f->tag, f->name, f->name);
+	} else if (f->isarray) {
+		const char *w = rmethod(f->type);
+		if (f->type == ZPROTO_BOOLEAN) {
+			snprintf(b, sizeof(b),
+				"\t\tcase %d: {\n"
+				"\t\t\tuint32_t c = d.r_array();\n"
+				"\t\t\tthis->%s.resize(c);\n"
+				"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
+				"\t\t\t\tthis->%s[i] = (d.r_u8() == 1);\n"
+				"\t\t\t}\n"
+				"\t\t\tbreak;\n"
+				"\t\t}\n",
+				f->tag, f->name, f->name);
+		} else {
+			const char *c = dcast(f->type);
+			snprintf(b, sizeof(b),
+				"\t\tcase %d: {\n"
+				"\t\t\tuint32_t c = d.r_array();\n"
+				"\t\t\tthis->%s.resize(c);\n"
+				"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
+				"\t\t\t\tthis->%s[i] = %sd.%s();\n"
+				"\t\t\t}\n"
+				"\t\t\tbreak;\n"
+				"\t\t}\n",
+				f->tag, f->name, f->name, c, w);
+		}
+	} else if (f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) {
+		snprintf(b, sizeof(b),
+			"\t\tcase %d:\n"
+			"\t\t\td.r_bytes(this->%s);\n"
+			"\t\t\tbreak;\n",
+			f->tag, f->name);
+	} else if (f->type == ZPROTO_BOOLEAN) {
+		snprintf(b, sizeof(b),
+			"\t\tcase %d:\n"
+			"\t\t\tthis->%s = (d.r_u8() == 1);\n"
+			"\t\t\tbreak;\n",
+			f->tag, f->name);
+	} else {
+		const char *w = rmethod(f->type);
+		const char *c = dcast(f->type);
+		snprintf(b, sizeof(b),
+			"\t\tcase %d:\n"
+			"\t\t\tthis->%s = %sd.%s();\n"
+			"\t\t\tbreak;\n",
+			f->tag, f->name, c, w);
+	}
+	return b;
 }
 
 static std::string inline
@@ -69,15 +283,15 @@ reset_normal(struct zproto_field *f)
 	const char *fmt = "";
 	char buff[1024];
 	if (f->isarray) {
-		fmt = "\t%s.clear();\n";
+		fmt = "\tthis->%s.clear();\n";
 	} else {
 		switch (f->type) {
 		case ZPROTO_BLOB:
 		case ZPROTO_STRING:
-			fmt = "\t%s.clear();\n";
+			fmt = "\tthis->%s.clear();\n";
 			break;
 		case ZPROTO_BOOLEAN:
-			fmt = "\t%s = false;\n";
+			fmt = "\tthis->%s = false;\n";
 			break;
 		case ZPROTO_BYTE:
 		case ZPROTO_SHORT:
@@ -87,10 +301,10 @@ reset_normal(struct zproto_field *f)
 		case ZPROTO_USHORT:
 		case ZPROTO_UINTEGER:
 		case ZPROTO_ULONG:
-			fmt = "\t%s = 0;\n";
+			fmt = "\tthis->%s = 0;\n";
 			break;
 		case ZPROTO_FLOAT:
-			fmt = "\t%s = 0.0f;\n";
+			fmt = "\tthis->%s = 0.0f;\n";
 			break;
 		}
 	}
@@ -99,120 +313,60 @@ reset_normal(struct zproto_field *f)
 }
 
 static std::string inline
-fill_struct(struct zproto_field *f)
-{
-	char buff[1024];
-	const char *fmt =
-	"\tcase %d:\n"
-	"\t\treturn %s._encode(_args->buff, _args->buffsz, _args->sttype);\n";
-
-	const char *afmt =
-	"\tcase %d:\n"
-	"\t\tif (_args->idx >= (int)%s.size()) {\n"
-	"\t\t\t_args->len = _args->idx;\n"
-	"\t\t\treturn ZPROTO_NOFIELD;\n"
-	"\t\t}\n"
-	"\t\treturn %s[_args->idx]._encode(_args->buff, _args->buffsz, _args->sttype);\n";
-
-	const char *mfmt =
-	"\tcase %d: {\n"
-	"\t\tint ret;\n"
-	"\t\tif (_args->idx == 0) {\n"
-	"\t\t\t_mapiterator.%s = %s.begin();\n"
-	"\t\t}\n"
-	"\t\tif (_mapiterator.%s == %s.end()) {\n"
-	"\t\t\t_args->len = _args->idx;\n"
-	"\t\t\treturn ZPROTO_NOFIELD;\n"
-	"\t\t}\n"
-	"\t\tret = _mapiterator.%s->second._encode(_args->buff, _args->buffsz, _args->sttype);\n"
-	"\t\t++_mapiterator.%s;\n"
-	"\t\treturn ret;}\n";
-
-	if (f->mapkey) {
-		assert(f->isarray);
-		snprintf(buff, 1024, mfmt, f->tag,
-				f->name, f->name,
-				f->name, f->name,
-				f->name,
-				f->name);
-	} else if (f->isarray) {
-		snprintf(buff, 1024, afmt, f->tag, f->name, f->name);
-	} else {
-		snprintf(buff, 1024, fmt, f->tag, f->name);
-	}
-	return buff;
-}
-
-static std::string inline
-to_struct(struct zproto_field *f)
-{
-	char buff[512];
-	const char *fmt =
-	"\tcase %d:\n"
-	"\t\treturn %s._decode(_args->buff, _args->buffsz, _args->sttype);\n";
-	const char *afmt =
-	"\tcase %d:\n"
-	"\t\tassert(_args->idx >= 0);\n"
-	"\t\tif (_args->len == 0)\n"
-	"\t\t\treturn 0;\n"
-	"\t\t%s.resize(_args->idx + 1);\n"
-	"\t\treturn %s[_args->idx]._decode(_args->buff, _args->buffsz, _args->sttype);\n";
-	const char *mfmt =
-	"\tcase %d: {\n"
-	"\t\tint ret;\n"
-	"\t\tstruct %s _tmp;\n"
-	"\t\tassert(_args->idx >= 0);\n"
-	"\t\tif (_args->len == 0)\n"
-	"\t\treturn 0;\n"
-	"\t\tret = _tmp._decode(_args->buff, _args->buffsz, _args->sttype);\n"
-	"\t\t%s[_tmp.%s] = std::move(_tmp);\n"
-	"\t\treturn ret;\n"
-	"\t}\n";
-	if (f->mapkey) {
-		assert(f->isarray);
-		snprintf(buff, 512, mfmt, f->tag, zproto_name(f->seminfo), f->name, f->mapkey->name);
-	} else if (f->isarray) {
-		snprintf(buff, 512, afmt, f->tag, f->name, f->name);
-	} else {
-		snprintf(buff, 512, fmt, f->tag, f->name);
-	}
-	return buff;
-}
-
-static std::string inline
 reset_struct(struct zproto_field *f)
 {
 	char buff[1024];
 	if (f->isarray)
-		snprintf(buff, 1024, "\t%s.clear();\n", f->name);
+		snprintf(buff, 1024, "\tthis->%s.clear();\n", f->name);
 	else
-		snprintf(buff, 1024, "\t%s._reset();\n", f->name);
+		snprintf(buff, 1024, "\tthis->%s._reset();\n", f->name);
 	return buff;
 }
 
+// _encode(std::string &) wrapper: construct an encoder over the output
+// string, drive each present field in declaration order, then finish().
 static std::string inline
-format_code(const char *base, const char *name, const char *qualifier)
+format_encode(const char *base, int basetag, int fieldcount)
 {
 	const char *fmt =
 	"int\n"
-	"%s::%s(struct zproto_args *_args) %s\n"
+	"%s::_encode(std::string &out) const\n"
 	"{\n"
-	"\tswitch (_args->tag) {\n";
-
-	char buff[1024];
-	snprintf(buff, 1024, fmt, base, name, qualifier);
+	"\tzprotobuf::encoder e(out, %d, %d);\n";
+	char buff[256];
+	snprintf(buff, sizeof(buff), fmt, base, basetag, fieldcount);
 	return buff;
 }
 
 static std::string inline
-format_close()
+format_encode_close()
+{
+	return "\treturn e.finish();\n}\n";
+}
+
+// _decode(const uint8_t *, size_t) wrapper: construct a decoder, loop
+// next(tag), switch on tag reading each field, default stops.
+static std::string inline
+format_decode(const char *base, int basetag)
 {
 	const char *fmt =
-	"\tdefault:\n"
-	"\t\treturn ZPROTO_ERROR;\n"
-	"\t}\n"
-	"}\n";
-	return fmt;
+	"int\n"
+	"%s::_decode(const uint8_t *data, size_t sz)\n"
+	"{\n"
+	"\tzprotobuf::decoder d(data, sz, %d);\n"
+	"\tfor (int tag; d.next(tag); ) {\n"
+	"\t\tswitch (tag) {\n";
+	char buff[256];
+	snprintf(buff, sizeof(buff), fmt, base, basetag);
+	return buff;
+}
+
+static std::string inline
+format_decode_close()
+{
+	// unknown tag -> return 0 (forward-compat stop); full message ->
+	// d.size() (SIZEOF_LEN + datasize, matching zproto_decode's return).
+	return "\t\tdefault:\n\t\t\treturn 0;\n\t\t}\n\t}\n\treturn (int)d.size();\n}\n";
 }
 
 static std::string inline
@@ -257,34 +411,6 @@ format_tag(const char *base, int tag)
 	return buff;
 }
 
-static std::string inline
-format_query(const char *base)
-{
-	const char *fmt =
-	"struct zproto_struct *%s::_st = nullptr;\n"
-	"struct zproto_struct *\n"
-	"%s::_query() const\n"
-	"{\n"
-	"\treturn _st;\n"
-	"}\n"
-	"void\n"
-	"%s::_load(wiretree &t)\n"
-	"{\n"
-	"\t%s::_st = t.query(\"%s\");\n"
-	"\tassert(%s::_st);\n"
-	"}\n";
-	char buff[1024];
-	snprintf(buff, 1024,"\t%s::_load(*this);\n", base);
-	querystmts.push_back(buff);
-	snprintf(buff, 1024, fmt,
-			base,
-			base,
-			base,
-			base, base,
-			base);
-	return buff;
-}
-
 static int prototype_cb(struct zproto_field *f, struct stmt_args *ud);
 
 static void
@@ -323,9 +449,6 @@ formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 		//_name()
 		tmp = format_name(newargs.base.c_str());
 		newargs.stmts.push_back(tmp);
-		//_query()
-		tmp = format_query(newargs.base.c_str());
-		newargs.stmts.push_back(tmp);
 	}
 	//_reset()
 	tmp = format_reset(newargs.base.c_str());
@@ -333,21 +456,20 @@ formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 	newargs.resetstm.push_back("\n}\n");
 	newargs.stmts.insert(newargs.stmts.end(), newargs.resetstm.begin(),
 			newargs.resetstm.end());
-	//_encode_field
-	tmp = format_code(newargs.base.c_str(), "_encode_field", "const");
+	//_encode(std::string &)
+	tmp = format_encode(newargs.base.c_str(), st->basetag, st->fieldcount);
 	newargs.encodestm.insert(newargs.encodestm.begin(), tmp);
-	tmp = format_close();
-	newargs.encodestm.push_back(tmp);
-
 	newargs.stmts.insert(newargs.stmts.end(), newargs.encodestm.begin(),
 			newargs.encodestm.end());
-	//_decode_field
-	tmp = format_code(newargs.base.c_str(), "_decode_field", "");
+	tmp = format_encode_close();
+	newargs.stmts.push_back(tmp);
+	//_decode(const uint8_t *, size_t)
+	tmp = format_decode(newargs.base.c_str(), st->basetag);
 	newargs.decodestm.insert(newargs.decodestm.begin(), tmp);
-	tmp = format_close();
-	newargs.decodestm.push_back(tmp);
 	newargs.stmts.insert(newargs.stmts.end(), newargs.decodestm.begin(),
 			newargs.decodestm.end());
+	tmp = format_decode_close();
+	newargs.stmts.push_back(tmp);
 	//
 	defined.insert(st);
 	return ;
@@ -356,15 +478,14 @@ formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
 static int
 prototype_cb(struct zproto_field *f, struct stmt_args *ud)
 {
-	struct stmt_args newargs;
 	std::string estm;
 	std::string dstm;
 	std::string rstm;
 
 	switch (f->type) {
 	case ZPROTO_STRUCT:
-		estm = fill_struct(f);
-		dstm = to_struct(f);
+		estm = encode_stmt(f);
+		dstm = decode_stmt(f);
 		rstm = reset_struct(f);
 		break;
 	case ZPROTO_BLOB:
@@ -379,8 +500,8 @@ prototype_cb(struct zproto_field *f, struct stmt_args *ud)
 	case ZPROTO_USHORT:
 	case ZPROTO_UINTEGER:
 	case ZPROTO_ULONG:
-		estm = fill_normal(f);
-		dstm = to_normal(f);
+		estm = encode_stmt(f);
+		dstm = decode_stmt(f);
 		rstm = reset_normal(f);
 		break;
 	default:
@@ -421,43 +542,8 @@ dumpst(FILE *fp, struct zproto *z)
 	return ;
 }
 
-static void
-wiretree(FILE *fp, const char *proto)
-{
-	int i;
-	char buff[8];
-	std::string hex = "const char *def = \"";
-	for (i = 0; proto[i]; i++) {
-		snprintf(buff, 8, "\\x%x", (uint8_t)proto[i]);
-		hex += buff;
-	}
-	hex += "\";\n";
-	fprintf(fp, "%s\n", hex.c_str());
-	fprintf(fp,
-"serializer::serializer()\n"
-"	 :wiretree(def)\n"
-"{\n"
-);
-	dump_vecstring(fp, querystmts);
-	fprintf(fp,
-"}\n"
-"serializer &\n"
-"serializer::instance()\n"
-"{\n"
-"	 static serializer *inst = new serializer();\n"
-"	 return *inst;\n"
-"}\n");
-}
-
-static const char *wirep =
-"wiretree&\n"
-"wirepimpl::_wiretree() const\n"
-"{\n"
-"	return serializer::instance();\n"
-"}\n\n";
-
 void
-body(const char *name, std::vector<const char*> &space, const char *proto, struct zproto *z)
+body(const char *name, std::vector<const char*> &space, const char * /*proto*/, struct zproto *z)
 {
 	FILE *fp;
 	std::string path = name;
@@ -482,13 +568,9 @@ body(const char *name, std::vector<const char*> &space, const char *proto, struc
 	for (const auto p:space)
 		fprintf(fp, "namespace %s {\n", p);
 	fprintf(fp, "%s", "\nusing namespace zprotobuf;\n\n");
-	fprintf(fp, "%s", wirep);
 	dumpst(fp, z);
-	wiretree(fp, proto);
 	for (size_t i = 0; i < space.size(); i++)
 		fprintf(fp, "}");
 	fprintf(fp, "\n");
 	fclose(fp);
 }
-
-

@@ -15,19 +15,21 @@ struct prototype_args {
 	std::vector<std::string> type;
 	std::vector<std::string> fields;
 	std::vector<std::string> encode;
-	std::vector<std::string> iters;
 };
 
+// per-struct virtual declarations (all public: these are the direct-drive
+// API the user calls, not internal callbacks).
+//   public:
+//     virtual int _encode(std::string &) const;
+//     virtual int _decode(const uint8_t *, size_t);
+//     virtual void _reset();
+//     (protocol) virtual int _tag() const; virtual const char *_name() const;
 const char *funcproto = "\
-%sprotected:\n\
-%s\
-%svirtual int _encode_field(struct zproto_args *args) const;\n\
-%svirtual int _decode_field(struct zproto_args *args);\n\
-%s\
 %spublic:\n\
+%svirtual int _encode(std::string &) const;\n\
+%svirtual int _decode(const uint8_t *, size_t);\n\
 %svirtual void _reset();\n\
-%s\
-";
+%s";
 
 static std::string
 tab(int level)
@@ -47,8 +49,6 @@ formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newa
 	char buff[2048];
 	std::string t1 = tab(newargs.level);
 	std::string t2 = tab(newargs.level - 1);
-	std::string iterwrapper;
-	std::string iterdefine;
 	struct zproto_struct *const*start, *const*end;
 	const struct zproto_starray *sts;
 	sts = (st == NULL) ? zproto_root(z) : st->child;
@@ -79,48 +79,27 @@ formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newa
 	//open
 	const char *herit;
 	if (protocol.count(st))
-		herit = ":public wirepimpl";
+		herit = ":public wirep";
 	else
 		herit = ":public wire ";
 	newargs.fields.insert(
 		newargs.fields.begin(),
                 t2 + "struct " + zproto_name(st) + herit + "{\n");
-	if (newargs.iters.size()) {
-		std::stringstream ss;
-		ss << t1 << "union iterator_wrapper {\n";
-		ss << t1 << t1 << "iterator_wrapper(){};\n";
-		for (const auto &iter:newargs.iters)
-			ss << t1 << t1 << iter;
-		ss << t1 << "};\n";
-		iterwrapper = ss.str();
-		iterdefine = t1 + "mutable union iterator_wrapper _mapiterator;\n";
-	}
 	//member function
 	char wirep_query[2048];
 	if (protocol.count(st)) {
 		snprintf(wirep_query, 2048,
 				"%svirtual int _tag() const;\n"
-				"%svirtual const char *_name() const;\n"
-				"%svirtual zproto_struct *_query() const;\n"
-				"%sstatic void _load(wiretree &t);\n"
-				"%sprivate:\n"
-				"%sstatic zproto_struct *_st;\n",
+				"%svirtual const char *_name() const;\n",
 				t1.c_str(),
-				t1.c_str(),
-				t1.c_str(),
-				t1.c_str(),
-				t2.c_str(),
 				t1.c_str());
 	} else {
 		wirep_query[0] = 0;
 	}
         snprintf(buff, 2048, funcproto,
 			t2.c_str(),
-			iterwrapper.c_str(),
 			t1.c_str(),
 			t1.c_str(),
-			iterdefine.c_str(),
-			t2.c_str(),
 			t1.c_str(),
 			wirep_query);
 	newargs.fields.push_back(buff);
@@ -172,7 +151,6 @@ prototype_cb(struct zproto_field *f, struct prototype_args &ud)
 {
 	char buff[2048];
 	std::string type;
-	std::string iter;
 	std::string subtype;
 	std::string defval;
 	if (f->mapkey != NULL) {
@@ -183,7 +161,6 @@ prototype_cb(struct zproto_field *f, struct prototype_args &ud)
 		fud.type = typestr(f->mapkey->type, NULL);
 		assert(fud.type != "");
 		str = "std::unordered_map<" + fud.type + ", %s> %s%s;\n";
-		iter = "std::unordered_map<" + fud.type + ", %s>::const_iterator %s;\n";
 		type = tab(ud.level) + str;
 	} else if(f->isarray) {
 		type = tab(ud.level) + "std::vector<%s> %s%s;\n";
@@ -211,10 +188,6 @@ prototype_cb(struct zproto_field *f, struct prototype_args &ud)
 	subtype = typestr(f->type, f->seminfo);
 	snprintf(buff, 2048, type.c_str(), subtype.c_str(), f->name, defval.c_str());
 	ud.fields.push_back(buff);
-	if (iter.size()) {
-		snprintf(buff, 2048, iter.c_str(), subtype.c_str(), f->name);
-		ud.iters.push_back(buff);
-	}
 	return 0;
 }
 
@@ -246,22 +219,6 @@ dumpst(FILE *fp, struct zproto *z)
 	}
 }
 
-static void
-wiretree(FILE *fp)
-{
-	fprintf(fp, "%s",
-"class serializer:public wiretree {\n"
-"\tserializer();\n"
-"public:\n"
-"\tstatic serializer &instance();\n"
-"};\n");
-}
-const char *wirep =
-"struct wirepimpl:public wirep {\n"
-"protected:\n"
-"        virtual wiretree &_wiretree() const;\n"
-"};\n\n";
-
 void
 header(const char *name, std::vector<const char *> &space, struct zproto *z)
 {
@@ -286,13 +243,10 @@ header(const char *name, std::vector<const char *> &space, struct zproto *z)
 	for (const auto p:space)
 		fprintf(fp, "namespace %s {\n", p);
 	fprintf(fp, "%s", "\nusing namespace zprotobuf;\n\n");
-	fprintf(fp, "%s", wirep);
 	dumpst(fp, z);
-	wiretree(fp);
 	fprintf(fp, "\n");
 	for (size_t i = 0; i < space.size(); i++)
 		fprintf(fp, "}");
 	fprintf(fp, "\n#endif\n");
 	fclose(fp);
 }
-

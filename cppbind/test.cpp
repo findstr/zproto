@@ -90,13 +90,10 @@ test_normal()
 {
 	std::string dat;
 	std::string cook, tmp;
-	const uint8_t *datbuf;
-	const uint8_t *cookbuf;
-	int datsize, cooksize;
 	hello::world::packet pk2;
 	hello::world::packet pk3;
 	hello::world::packet clr;
-	int sz = pk._serialize(dat);
+	int sz = pk._encode(dat);
 	printf("tag:%x\n", pk._tag());
 	printf("encode1 size:%d\n", sz);
 	print_hex((uint8_t *)dat.c_str(), dat.size());
@@ -104,23 +101,22 @@ test_normal()
 	printf("pack1 size:%d\n", sz);
 	print_hex((uint8_t *)cook.c_str(), cook.size());
 	//
-	datsize = pk._serialize(&datbuf);
-	printf("encode2 size:%d\n", datsize);
-	print_hex(datbuf, datsize);
-	cooksize = pk._pack(datbuf, datsize, &cookbuf);
-	printf("pack2 size:%d\n", cooksize);
-	print_hex(cookbuf, cooksize);
-	tmp.assign((char *)cookbuf, cooksize);
+	sz = pk._encode(tmp);
+	printf("encode2 size:%d\n", sz);
+	print_hex((uint8_t *)tmp.c_str(), tmp.size());
+	sz = pk._pack((uint8_t *)tmp.c_str(), tmp.size(), cook);
+	printf("pack2 size:%d\n", sz);
+	print_hex((uint8_t *)cook.c_str(), cook.size());
 	//
 	dat.clear();
 	pk2._unpack((uint8_t *)cook.c_str(), cook.size(), dat);
-	sz = pk2._parse(dat);
+	sz = pk2._decode((const uint8_t *)dat.data(), dat.size());
 	printf("decode1 size:%d\n", sz);
 	print_struct(pk2);
 	assert_struct(pk2, pk);
 	//
-	datsize = pk3._unpack((uint8_t *)tmp.c_str(), tmp.size(), &datbuf);
-	sz = pk3._parse(datbuf, datsize);
+	pk3._unpack((uint8_t *)cook.c_str(), cook.size(), tmp);
+	sz = pk3._decode((const uint8_t *)tmp.data(), tmp.size());
 	printf("decode2 size:%d\n", sz);
 	print_struct(pk3);
 	assert_struct(pk3, pk);
@@ -136,15 +132,12 @@ test_thread(void *)
 	pkk.phone[1].home = 0x3389 + rand() % 10;
 	pkk.phone[1].work = 999.98 + rand() % 10;
 	std::string pk_dat;
-	pkk._serializesafe(pk_dat);
+	pkk._encode(pk_dat);
 	for (i = 0; i < 100; i++) {
 		std::string out;
-		pkk._serialize(out);
+		pkk._encode(out);
 		if (out != pk_dat)
-			printf("[multithread] _serialize memory corrupt\n");
-		pkk._serializesafe(out);
-		if (out != pk_dat)
-			printf("[multithread] _serializesafe memory corrupt\n");
+			printf("[multithread] _encode memory corrupt\n");
 	}
 	return NULL;
 }
@@ -181,4 +174,3 @@ int main()
 	pthread_join(pid2, NULL);
 	return 0;
 }
-
