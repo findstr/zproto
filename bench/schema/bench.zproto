@@ -64,7 +64,7 @@ snapshot 0x40 {
 	.inventory:item[] 5
 	.buffs:integer[] 6
 	.flags:boolean[] 7
-	.friends:playerlevel[userid] 8
+	.friends:playerlevel[] 8
 	.level:uinteger 9
 }
 alltypes 0xFF {
@@ -86,8 +86,8 @@ alltypes 0xFF {
 	.abool:boolean[] 16
 	.nest_n:nest 17
 	.nest_na:nest[] 18
-	.m_int:mapi[k] 19
-	.m_float:mapf[k] 20
+	.m_int:mapi[] 19
+	.m_float:mapf[] 20
 	.aempty:integer[] 21
 	.asingle:integer[] 22
 }

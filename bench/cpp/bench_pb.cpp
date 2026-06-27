@@ -26,7 +26,7 @@ static void fill(Snapshot &m) {
 	for (int i = 0; i < 50; i++) { auto *it = m.add_inventory(); it->set_id(i+1); it->set_count((i+1)*2); }
 	for (int i = 0; i < 32; i++) m.add_buffs((i % 2) ? 0 : i);
 	for (int i = 0; i < 64; i++) m.add_flags(i < 32);
-	for (int k = 1; k <= 100; k++) (*m.mutable_friends())[k].set_v(k * 10);   // key=userid, value=level
+	for (int i = 0; i < 100; i++) { auto *f = m.add_friends(); f->set_userid(i + 1); f->set_level((i + 1) * 10); }
 }
 static void fill(Alltypes &m) {
 	m.set_b(true); m.set_i8(-1); m.set_u8(0xff); m.set_i16(-1); m.set_u16(0xffff);
@@ -38,8 +38,8 @@ static void fill(Alltypes &m) {
 	for (int i = 0; i < 64; i++) m.add_abool(i % 2);
 	m.mutable_nest_n()->set_x(1); m.mutable_nest_n()->set_y(2);
 	for (int i = 0; i < 32; i++) { auto *n = m.add_nest_na(); n->set_x(i); n->set_y(-i); }
-	for (int k = 0; k < 50; k++) (*m.mutable_m_int())[k].set_v(k);
-	for (int k = 0; k < 50; k++) { (*m.mutable_m_float())[k].set_fv((float)k + 0.5f); }
+	for (int i = 0; i < 50; i++) { auto *e = m.add_m_int(); e->set_k(i); e->set_v(i); }
+	for (int i = 0; i < 50; i++) { auto *e = m.add_m_float(); e->set_k(i); e->set_fv((float)i + 0.5f); }
 	m.add_asingle(7);
 }
 

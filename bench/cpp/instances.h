@@ -29,10 +29,8 @@ inline void fill(bench::snapshot &m) {
 	for (int i = 0; i < 32; i++) m.buffs[i] = (i % 2) ? 0 : i;   // ~½ zero
 	m.flags.resize(64);
 	for (int i = 0; i < 64; i++) m.flags[i] = (i < 32);
-	// map value must carry its own key field (userid) for the entry to
-	// round-trip: the decoder re-inserts by the value's key field, not the
-	// external map key, so leaving it at 0 would collapse all entries to key 0.
-	for (int k = 1; k <= 100; k++) { m.friends[k].userid = k; m.friends[k].level = k * 10; }
+	m.friends.resize(100);
+	for (int i = 0; i < 100; i++) { m.friends[i].userid = i + 1; m.friends[i].level = (i + 1) * 10; }
 }
 inline void fill(bench::alltypes &m) {
 	m.b = true; m.i8 = -1; m.u8 = 0xff; m.i16 = -1; m.u16 = 0xffff;
@@ -44,10 +42,10 @@ inline void fill(bench::alltypes &m) {
 	m.abool.resize(64); for (int i = 0; i < 64; i++) m.abool[i] = (i % 2);
 	m.nest_n.x = 1; m.nest_n.y = 2;
 	m.nest_na.resize(32); for (int i = 0; i < 32; i++) { m.nest_na[i].x = i; m.nest_na[i].y = -i; }
-	// mapi/mapf values carry their key field (.k); set it to match the
-	// external map key so decode re-inserts under the same key (see snapshot).
-	for (int k = 0; k < 50; k++) { m.m_int[k].k = k; m.m_int[k].v = k; }
-	for (int k = 0; k < 50; k++) { m.m_float[k].k = k; m.m_float[k].fv = (float)k + 0.5f; }
+	m.m_int.resize(50);
+	for (int i = 0; i < 50; i++) { m.m_int[i].k = i; m.m_int[i].v = i; }
+	m.m_float.resize(50);
+	for (int i = 0; i < 50; i++) { m.m_float[i].k = i; m.m_float[i].fv = (float)i + 0.5f; }
 	m.aempty.clear();
 	m.asingle = {7};
 }
