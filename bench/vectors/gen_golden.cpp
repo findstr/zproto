@@ -71,6 +71,7 @@ int main(void) {
 	// tail partial (all-ff, non-multiple-of-8)
 	ps.push_back({"ffx7", fill(7, 0xff)});
 	ps.push_back({"ffx9", fill(9, 0xff)});
+	ps.push_back({"ffx14", fill(14, 0xff)});
 	ps.push_back({"ffx15", fill(15, 0xff)});
 	ps.push_back({"ffx17", fill(17, 0xff)});
 	// raw fidelity: a run of distinct nonzeros
