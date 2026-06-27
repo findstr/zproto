@@ -16,7 +16,7 @@ Branch: `wire-traits` (off master `34ed4ad`). Goal: clean POD structs + `wire<T>
 - ✅ Phase 2b: `body.cpp` — emits `X.wire.hpp` (`wire<T>` specializations). **THE BIG PIECE.** Done; byte-identical to the C reference across all field types (see Verification).
 - ⬜ Phase 3: regen + update all callers (test_codec, bench, hello_world; includes `.h`→`.hpp`; namespace `zprotobuf`→`zproto`).
 - ⬜ Phase 4: verify byte-identical (codec conformance, interop, bench all pass; wire bytes unchanged).
-- ⬜ Phase 5: optimize `pack` (Buffer-direct-write).
+- ⬜ Phase 5: optimize `pack` (Buffer-direct-write). — **partial**: pack rewritten to cursor-write + memset-free scratch buffer (byte-exact); see *Performance* for why pack+encode can't reach 2× without SIMD.
 
 ## Phase 2b: body.cpp — emit `X.wire.hpp` per struct
 
@@ -68,3 +68,27 @@ Byte-equivalence (all green, scratch harness in `.wire_verify/`):
 - **gap** (tags 1/5/10): non-sequential delta header `[datasize][tagcount=3][0,3,4][body]` byte-identical to the original C `zproto_encode`.
 
 Known carry-over (not phase-2b): `namespace zproto` (runtime) collides with `struct zproto` (parser, `zproto.h`) if both are included in one TU — the gap cross-check sidesteps this by running the C reference as a separate process. Phase 3 (regen + caller updates) will surface this wherever a TU needs both.
+
+## Performance — zproto wire<T> vs protobuf (pack optimization pass)
+
+Measured on the bench schema, `-O3`, reused output buffers (real-world). Ratios are zproto/pb (lower = faster; 0.50 = 2× faster).
+
+| op (vs pb) | snapshot (3376 B wire) | alltypes (3492 B wire) |
+|---|---|---|
+| encode (no pack) | **0.21 → 4.7× faster** | **0.22 → 4.5× faster** |
+| decode (no unpack) | **0.32 → 3.1× faster** | **0.31 → 3.3× faster** |
+| pack + encode | 1.34× slower | 0.71 → 1.4× faster |
+| unpack + decode | ~1.0× (parity) | 0.73 → 1.4× faster |
+
+**The design wins ≥2× on both hot paths that don't compress** (encode 4.5–4.7×, decode 3.1–3.3×). Fixed-width direct-write encode/decode is inherently cheaper than pb's per-field varint marshal/parse; pb's varint decode is especially slow, so decode is the strongest win.
+
+**`pack` is the one place zproto converges with pb.** Root cause (callgrind, `--cache-sim`):
+- The per-byte `if (src[i])` nonzero scan in `packseg` is **27.7% of all instructions and 96.7% of data reads** (~10.8 insn/input-byte; ~36k insn per snapshot pack).
+- Ruled out: cache misses (LL 0.0%, L1 negligible — fits in L1), `memcpy`-8 (raw-run path is 0.18%), branch misprediction (cost is pattern-independent), function-call overhead (inlined).
+- Why pack > encode: pack must *inspect* every byte (load+test+branch/byte); encode *writes* fixed-width fields (~1.25 insn/byte, no inspection). pb never emits zero bytes (varints), so it avoids the scan zproto pays for in `pack`. Compressing to pb's size costs ≈ pb's CPU — that's the convergence.
+
+`pack` rewritten (byte-exact, 24/24 golden): cursor-write into a pre-sized buffer (no `push_back`), then into a memset-free scratch buffer + `assign` (no zero-fill waste). Modest gain on compressible data (~8–10%); the per-byte scan remains the scalar floor.
+
+**2× on pack+encode is unreachable without SIMD** (the per-byte zero-detection floor). Note: SSE2 (all x86-64) and NEON (all AArch64) are *baseline* ISA — zero compatibility risk, unlike AVX2/AVX-512. A baseline-SIMD `pack` (mask+gather per 8-byte segment, scalar run-counter) is the path to pack+encode 2× if that goal is later reinstated; deferred for now.
+
+Reframed goal: the 2× bar is met on encode and decode (the design's strength). `pack`/`unpack` are size optimizations that trade CPU for ~pb-level (or smaller) payloads, not a speed win over pb.

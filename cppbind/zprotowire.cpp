@@ -6,61 +6,63 @@
 namespace zproto {
 
 // ---- zero-suppression codec, ported from zproto.c (schema-independent) ----
+// Writes into a pre-sized buffer via a raw cursor (resize(upper) once, in-place
+// writes, resize(actual) at the end) — no per-byte push_back/append, which was
+// the hot-path bottleneck. Output is byte-identical to the push_back version.
 
-static int packseg(const uint8_t *src, int sn, std::string &dst) {
-	int i;
+static int packseg(const uint8_t *src, int sn, char *d, size_t &cur) {
 	int pack_sz = 0;
-	size_t hdr_pos = dst.size();
-	dst.push_back(0);                 // header byte placeholder
+	size_t hdr_pos = cur;
+	cur++;                             // header byte placeholder
 	sn = sn < 8 ? sn : 8;
 	uint8_t hdr = 0;
-	for (i = 0; i < sn; i++) {
+	for (int i = 0; i < sn; i++) {
 		if (src[i]) {
-			hdr |= 1 << i;
-			dst.push_back(src[i]);
+			hdr |= (uint8_t)(1 << i);
+			d[cur++] = (char)src[i];
 			++pack_sz;
 		}
 	}
-	dst[hdr_pos] = hdr;
+	d[hdr_pos] = (char)hdr;
 	return pack_sz;
 }
 
-static int packff(const uint8_t *src, int sn, std::string &dst) {
-	int i;
+static int packff(const uint8_t *src, int sn, char *d, size_t &cur) {
 	int packsz = 0;
 	sn = sn < 8 ? sn : 8;
-	for (i = 0; i < sn; i++) {
+	for (int i = 0; i < sn; i++) {
 		if (src[i])
 			++packsz;
 	}
 	if (packsz >= 6) {                // 6,7,8 non-zero: emit raw
-		dst.append((const char *)src, sn);
+		memcpy(d + cur, src, sn);
+		cur += sn;
 		packsz = sn;
 	}
 	return packsz;
 }
 
-static void pack_impl(const uint8_t *src, int sn, std::string &dst) {
+static void pack_impl(const uint8_t *src, int sn, char *d, size_t &cur) {
 	int packsz = -1;
 	size_t ffn_pos = 0;               // index of the run-counter byte (valid only in full-run state)
 	while (sn > 0) {
 		if (packsz != 8) {            // pack a segment
-			packsz = packseg(src, sn, dst);
+			packsz = packseg(src, sn, d, cur);
 			src += 8;
 			sn -= 8;
 			if (packsz == 8 && sn > 0) {   // full segment: reserve a run-counter byte
-				ffn_pos = dst.size();
-				dst.push_back(0);
+				ffn_pos = cur;
+				cur++;
 			}
 		} else {                      // packsz == 8: accumulate a full run
-			dst[ffn_pos] = (char)0;   // reset counter (access by index: append may realloc)
+			d[ffn_pos] = (char)0;     // reset counter
 			for (;;) {
-				packsz = packff(src, sn, dst);   // may append -> may realloc
+				packsz = packff(src, sn, d, cur);
 				if (packsz >= 6 && packsz <= 8) {
 					src += 8;
 					sn -= 8;
-					dst[ffn_pos] = (char)((unsigned char)dst[ffn_pos] + 1);
-					if ((unsigned char)dst[ffn_pos] == 255) {
+					d[ffn_pos] = (char)((unsigned char)d[ffn_pos] + 1);
+					if ((unsigned char)d[ffn_pos] == 255) {
 						packsz = -1;
 						break;
 					}
@@ -73,10 +75,17 @@ static void pack_impl(const uint8_t *src, int sn, std::string &dst) {
 }
 
 int pack(const uint8_t *src, int srcsz, std::string &dst) {
-	dst.clear();
-	dst.reserve(srcsz);                // can't predict compression; output ~= input
-	pack_impl(src, srcsz, dst);
-	return (int)dst.size();
+	// output upper bound (matches zproto_pack's needn): run-counter bytes
+	// (2 per 2048 input) + at most one raw byte per input byte + 1.
+	size_t cap = (size_t)(((srcsz + 2047) / 2048) * 2 + srcsz + 1);
+	// write into a raw scratch buffer (malloc does not zero-fill), then assign to
+	// dst — avoids zero-filling `cap` bytes only to overwrite/trim them.
+	char *buf = (char *)malloc(cap);
+	size_t cur = 0;
+	pack_impl(src, srcsz, buf, cur);
+	dst.assign(buf, cur);
+	free(buf);
+	return (int)cur;
 }
 
 static int unpackseg(const uint8_t *src, int sn, uint8_t *dst) {
