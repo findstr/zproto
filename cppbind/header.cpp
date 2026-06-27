@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <vector>
 #include <string>
-#include <sstream>
 #include <unordered_set>
 
 #include "zproto.hpp"
@@ -14,22 +13,7 @@ struct prototype_args {
 	int level;
 	std::vector<std::string> type;
 	std::vector<std::string> fields;
-	std::vector<std::string> encode;
 };
-
-// per-struct virtual declarations (all public: these are the direct-drive
-// API the user calls, not internal callbacks).
-//   public:
-//     virtual int _encode(std::string &) const;
-//     virtual int _decode(const uint8_t *, size_t);
-//     virtual void _reset();
-//     (protocol) virtual int _tag() const; virtual const char *_name() const;
-const char *funcproto = "\
-%spublic:\n\
-%svirtual int _encode(std::string &) const;\n\
-%svirtual int _decode(const uint8_t *, size_t);\n\
-%svirtual void _reset();\n\
-%s";
 
 static std::string
 tab(int level)
@@ -43,13 +27,12 @@ tab(int level)
 
 static int prototype_cb(struct zproto_field *f, struct prototype_args &ud);
 
+// emit a clean POD struct: just fields, no base class, no virtuals, no zproto dep.
 static void
 formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newargs)
 {
-	char buff[2048];
-	std::string t1 = tab(newargs.level);
 	std::string t2 = tab(newargs.level - 1);
-	struct zproto_struct *const*start, *const*end;
+	struct zproto_struct *const *start, *const *end;
 	const struct zproto_starray *sts;
 	sts = (st == NULL) ? zproto_root(z) : st->child;
 	if (sts != NULL) {
@@ -70,53 +53,25 @@ formatst(struct zproto *z, struct zproto_struct *st, struct prototype_args &newa
 	for (int i = 0; i < st->fieldcount; i++) {
 		prototype_cb(st->fields[i], newargs);
 	}
-	//subtype
+	// nested helper structs first
 	newargs.fields.insert(
 		newargs.fields.begin(),
 		newargs.type.begin(),
 		newargs.type.end()
 	);
-	//open
-	const char *herit;
-	if (protocol.count(st))
-		herit = ":public wirep";
-	else
-		herit = ":public wire ";
+	// open: clean POD struct (no inheritance)
 	newargs.fields.insert(
 		newargs.fields.begin(),
-                t2 + "struct " + zproto_name(st) + herit + "{\n");
-	//member function
-	char wirep_query[2048];
-	if (protocol.count(st)) {
-		snprintf(wirep_query, 2048,
-				"%svirtual int _tag() const;\n"
-				"%svirtual const char *_name() const;\n",
-				t1.c_str(),
-				t1.c_str());
-	} else {
-		wirep_query[0] = 0;
-	}
-        snprintf(buff, 2048, funcproto,
-			t2.c_str(),
-			t1.c_str(),
-			t1.c_str(),
-			t1.c_str(),
-			wirep_query);
-	newargs.fields.push_back(buff);
-
-	//close
+		t2 + "struct " + zproto_name(st) + " {\n"
+	);
+	// close
 	newargs.fields.insert(
 		newargs.fields.end(),
 		t2 + "};\n"
-		);
+	);
 	defined.insert(st);
-	return ;
+	return;
 }
-
-struct find_field_ud {
-	int tag;
-	std::string type;
-};
 
 static std::string
 typestr(int type, struct zproto_struct *st)
@@ -138,7 +93,7 @@ typestr(int type, struct zproto_struct *st)
 		{ZPROTO_UINTEGER, "uint32_t"},
 		{ZPROTO_ULONG, "uint64_t"},
 	};
-	for (size_t i = 0; i < sizeof(types)/ sizeof(types[0]); i++) {
+	for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
 		if (types[i].type == type)
 			return types[i].name;
 	}
@@ -154,15 +109,13 @@ prototype_cb(struct zproto_field *f, struct prototype_args &ud)
 	std::string subtype;
 	std::string defval;
 	if (f->mapkey != NULL) {
-		std::string str;
 		assert(f->isarray);
-		struct find_field_ud fud;
+		struct find_field_ud { int tag; std::string type; } fud;
 		fud.tag = f->mapkey->tag;
 		fud.type = typestr(f->mapkey->type, NULL);
 		assert(fud.type != "");
-		str = "std::unordered_map<" + fud.type + ", %s> %s%s;\n";
-		type = tab(ud.level) + str;
-	} else if(f->isarray) {
+		type = tab(ud.level) + "std::unordered_map<" + fud.type + ", %s> %s%s;\n";
+	} else if (f->isarray) {
 		type = tab(ud.level) + "std::vector<%s> %s%s;\n";
 	} else {
 		type = tab(ud.level) + "%s %s%s;\n";
@@ -194,7 +147,7 @@ prototype_cb(struct zproto_field *f, struct prototype_args &ud)
 static void
 dump_vecstring(FILE *fp, const std::vector<std::string> &tbl)
 {
-	for (const auto &str:tbl)
+	for (const auto &str : tbl)
 		fprintf(fp, "%s", str.c_str());
 	return;
 }
@@ -202,7 +155,7 @@ dump_vecstring(FILE *fp, const std::vector<std::string> &tbl)
 static void
 dumpst(FILE *fp, struct zproto *z)
 {
-	struct zproto_struct *const* start, *const* end;
+	struct zproto_struct *const *start, *const *end;
 	const struct zproto_starray *sts;
 	sts = zproto_root(z);
 	if (sts != NULL) {
@@ -219,11 +172,12 @@ dumpst(FILE *fp, struct zproto *z)
 	}
 }
 
+// emit X.hpp: #pragma once + zproto-free includes + clean POD structs.
 void
 header(const char *name, std::vector<const char *> &space, struct zproto *z)
 {
 	FILE *fp;
-	struct zproto_struct *const* start, *const* end;
+	struct zproto_struct *const *start, *const *end;
 	std::string path = name;
 	path += ".hpp";
 	const struct zproto_starray *sts;
@@ -238,15 +192,18 @@ header(const char *name, std::vector<const char *> &space, struct zproto *z)
 		}
 	}
 	fp = fopen(path.c_str(), "wb+");
-	fprintf(fp, "#ifndef __%s_h\n#define __%s_h\n", name, name);
-	fprintf(fp, "#include \"zprotowire.h\"\n");
-	for (const auto p:space)
+	fprintf(fp, "#pragma once\n");
+	fprintf(fp, "#include <cstdint>\n");
+	fprintf(fp, "#include <string>\n");
+	fprintf(fp, "#include <vector>\n");
+	fprintf(fp, "#include <unordered_map>\n");
+	for (const auto p : space)
 		fprintf(fp, "namespace %s {\n", p);
-	fprintf(fp, "%s", "\nusing namespace zprotobuf;\n\n");
+	fprintf(fp, "\n");
 	dumpst(fp, z);
 	fprintf(fp, "\n");
 	for (size_t i = 0; i < space.size(); i++)
 		fprintf(fp, "}");
-	fprintf(fp, "\n#endif\n");
+	fprintf(fp, "\n");
 	fclose(fp);
 }
