@@ -35,5 +35,6 @@ luabind/lua53
 luabind/test
 cppbind/test
 cppbind/*.hpp
+!cppbind/zprotowire.hpp
 cppbind/*.cc
 csbind/hello_world.cs

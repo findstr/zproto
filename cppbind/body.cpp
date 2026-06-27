@@ -1,47 +1,108 @@
 #include <assert.h>
-#include <vector>
+#include <stdio.h>
+#include <string.h>
 #include <string>
-#include <unordered_set>
+#include <vector>
+#include <unordered_map>
 
 #include "zproto.hpp"
 
-static std::unordered_set<struct zproto_struct *>	protocol;
-static std::unordered_set<struct zproto_struct *>	defined;
-struct stmt_args {
-	std::string base;
-	std::vector<std::string> encodestm;
-	std::vector<std::string> decodestm;
-	std::vector<std::string> resetstm;
-	std::vector<std::string> stmts;
-};
+// phase 2b: emit X.wire.hpp — a namespace-zproto block of wire<T> specializations
+// (one per struct). Each carries tag()/name() (tagged structs only), byte_size(),
+// write_at() (header + deltas + body, cursor-threaded into a pre-sized Buffer),
+// encode() (resize once + write_at), and decode() (schema-agnostic decoder switch,
+// recursing via wire<E>::decode for nested structs). No encoder object, no
+// virtuals, no .cc — the data structs stay clean PODs defined in X.hpp.
 
-// map a scalar type id to its encoder write method name
-static const char *
-wmethod(int type)
+// fully-qualified C++ type name for each struct, e.g. "::bench::frame" or
+// "::hello::world::packet::phone". Always carries its full leading scope so it
+// resolves from inside namespace zproto, where wire<> lives.
+static std::unordered_map<struct zproto_struct *, std::string> qname;
+// "::ns1::ns2::" prefix (or "::" when the schema has no namespace).
+static std::string qualprefix;
+
+// ---- scalar type tables (mirror the wire widths / decoder readers) ----
+
+// wire width in bytes for a scalar type.
+static int
+width(int type)
 {
 	switch (type) {
 	case ZPROTO_BOOLEAN:
 	case ZPROTO_BYTE:
 	case ZPROTO_UBYTE:
-		return "w_u8";
+		return 1;
 	case ZPROTO_SHORT:
 	case ZPROTO_USHORT:
-		return "w_u16";
+		return 2;
 	case ZPROTO_INTEGER:
 	case ZPROTO_UINTEGER:
-		return "w_u32";
+	case ZPROTO_FLOAT:
+		return 4;
 	case ZPROTO_LONG:
 	case ZPROTO_ULONG:
-		return "w_u64";
+		return 8;
+	default:
+		assert(0);
+		return 0;
+	}
+}
+
+// runtime put_uXX primitive a scalar is written with. float reuses put_u32 but
+// its argument is produced via a memcpy bit-cast by the caller.
+static const char *
+putfn(int type)
+{
+	switch (type) {
+	case ZPROTO_BOOLEAN:
+	case ZPROTO_BYTE:
+	case ZPROTO_UBYTE:
+		return "put_u8";
+	case ZPROTO_SHORT:
+	case ZPROTO_USHORT:
+		return "put_u16";
+	case ZPROTO_INTEGER:
+	case ZPROTO_UINTEGER:
 	case ZPROTO_FLOAT:
-		return "w_f32";
+		return "put_u32";
+	case ZPROTO_LONG:
+	case ZPROTO_ULONG:
+		return "put_u64";
 	default:
 		assert(0);
 		return NULL;
 	}
 }
 
-// map a scalar type id to its decoder read method name
+// the (uintN_t) cast applied to a scalar value before writing: signedness is
+// irrelevant on the wire, the cast only reinterprets the bit pattern into the
+// unsigned width put_uXX expects.
+static const char *
+ecast(int type)
+{
+	switch (type) {
+	case ZPROTO_BOOLEAN:
+	case ZPROTO_BYTE:
+	case ZPROTO_UBYTE:
+		return "(uint8_t)";
+	case ZPROTO_SHORT:
+	case ZPROTO_USHORT:
+		return "(uint16_t)";
+	case ZPROTO_INTEGER:
+	case ZPROTO_UINTEGER:
+		return "(uint32_t)";
+	case ZPROTO_LONG:
+	case ZPROTO_ULONG:
+		return "(uint64_t)";
+	case ZPROTO_FLOAT:
+		return "";
+	default:
+		assert(0);
+		return "";
+	}
+}
+
+// decoder read method name for a scalar type.
 static const char *
 rmethod(int type)
 {
@@ -67,510 +128,383 @@ rmethod(int type)
 	}
 }
 
-// the (T) cast wrapper applied to the value when encoding a scalar.
-// signedness is irrelevant on the wire: the cast reinterprets the bit
-// pattern into the unsigned width the encoder expects.
-static const char *
-ecast(int type)
-{
-	switch (type) {
-	case ZPROTO_BOOLEAN:	return "(uint8_t)";
-	case ZPROTO_BYTE:	return "(uint8_t)";
-	case ZPROTO_UBYTE:	return "(uint8_t)";
-	case ZPROTO_SHORT:	return "(uint16_t)";
-	case ZPROTO_USHORT:	return "(uint16_t)";
-	case ZPROTO_INTEGER:	return "(uint32_t)";
-	case ZPROTO_UINTEGER:	return "(uint32_t)";
-	case ZPROTO_LONG:	return "(uint64_t)";
-	case ZPROTO_ULONG:	return "(uint64_t)";
-	case ZPROTO_FLOAT:	return "";
-	default:
-		assert(0);
-		return "";
-	}
-}
-
-// the (T) cast applied to the decoder's unsigned read result so it
-// assigns back into the (possibly signed) member with the same bits.
+// cast applied to the decoder's unsigned read so it assigns back into the
+// (possibly signed) member with the same bits.
 static const char *
 dcast(int type)
 {
 	switch (type) {
-	case ZPROTO_BOOLEAN:	return "";	// handled specially: == 1
-	case ZPROTO_BYTE:	return "(int8_t)";
-	case ZPROTO_UBYTE:	return "";
-	case ZPROTO_SHORT:	return "(int16_t)";
-	case ZPROTO_USHORT:	return "";
-	case ZPROTO_INTEGER:	return "(int32_t)";
-	case ZPROTO_UINTEGER:	return "";
-	case ZPROTO_LONG:	return "(int64_t)";
-	case ZPROTO_ULONG:	return "";
-	case ZPROTO_FLOAT:	return "";
+	case ZPROTO_BOOLEAN:
+		return "";		// handled specially: == 1
+	case ZPROTO_BYTE:
+		return "(int8_t)";
+	case ZPROTO_UBYTE:
+		return "";
+	case ZPROTO_SHORT:
+		return "(int16_t)";
+	case ZPROTO_USHORT:
+		return "";
+	case ZPROTO_INTEGER:
+		return "(int32_t)";
+	case ZPROTO_UINTEGER:
+		return "";
+	case ZPROTO_LONG:
+		return "(int64_t)";
+	case ZPROTO_ULONG:
+		return "";
+	case ZPROTO_FLOAT:
+		return "";
 	default:
 		assert(0);
 		return "";
 	}
 }
 
-// returns the encode statement(s) for one field, emitted in
-// declaration order. Drives the schema-agnostic encoder directly.
+// ---- qualified-name collection --------------------------------------------
+// post-order DFS over the struct tree: records every struct's full type so a
+// field referencing struct E resolves regardless of where E sits. Emission
+// (dump_struct) uses the same post-order, so wire<E> is always defined before
+// any wire<X> that names it as a field type (required: wire<concrete-type> is a
+// non-dependent name, so the specialization must be complete at that point).
+
+static void
+collect(struct zproto_struct *st, const std::string &base)
+{
+	qname[st] = qualprefix + base;
+	const struct zproto_starray *sts = st->child;
+	if (sts != NULL) {
+		for (int i = 0; i < sts->count; i++) {
+			struct zproto_struct *child = sts->buf[i];
+			collect(child, base + "::" + zproto_name(child));
+		}
+	}
+}
+
+// ---- per-field body-size statements (summed into byte_size) ---------------
+
 static std::string
-encode_stmt(struct zproto_field *f)
+byte_size_stmt(struct zproto_field *f)
 {
 	char b[1024];
-	if (f->mapkey) {                         // struct map: array of struct values
+	const char *fn = f->name;
+	if (f->mapkey) {                                  // struct map: array of values
 		snprintf(b, sizeof(b),
-			"\te.present(%d);\n"
-			"\te.w_array((uint32_t)this->%s.size());\n"
-			"\tfor (const auto &kv : this->%s) {\n"
-			"\t\tkv.second._encode(out);\n"
-			"\t}\n",
-			f->tag, f->name, f->name);
+			"\t\tn += 4;\n"
+			"\t\tfor (const auto &kv : o.%s) n += wire<%s>::byte_size(kv.second);\n",
+			fn, qname[f->seminfo].c_str());
 	} else if (f->type == ZPROTO_STRUCT && f->isarray) {
 		snprintf(b, sizeof(b),
-			"\te.present(%d);\n"
-			"\te.w_array((uint32_t)this->%s.size());\n"
-			"\tfor (const auto &v : this->%s) {\n"
-			"\t\tv._encode(out);\n"
-			"\t}\n",
-			f->tag, f->name, f->name);
+			"\t\tn += 4;\n"
+			"\t\tfor (const auto &v : o.%s) n += wire<%s>::byte_size(v);\n",
+			fn, qname[f->seminfo].c_str());
 	} else if (f->type == ZPROTO_STRUCT) {
 		snprintf(b, sizeof(b),
-			"\te.present(%d);\n"
-			"\tthis->%s._encode(out);\n",
-			f->tag, f->name);
+			"\t\tn += wire<%s>::byte_size(o.%s);\n",
+			qname[f->seminfo].c_str(), fn);
 	} else if ((f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) && f->isarray) {
 		snprintf(b, sizeof(b),
-			"\te.present(%d);\n"
-			"\te.w_array((uint32_t)this->%s.size());\n"
-			"\tfor (const auto &v : this->%s) {\n"
-			"\t\te.w_bytes(v.data(), v.size());\n"
-			"\t}\n",
-			f->tag, f->name, f->name);
+			"\t\tn += 4;\n"
+			"\t\tfor (const auto &v : o.%s) n += 4 + v.size();\n", fn);
 	} else if (f->isarray) {
-		const char *w = wmethod(f->type);
-		const char *c = ecast(f->type);
 		snprintf(b, sizeof(b),
-			"\te.present(%d);\n"
-			"\te.w_array((uint32_t)this->%s.size());\n"
-			"\tfor (const auto &v : this->%s) {\n"
-			"\t\te.%s(%sv);\n"
-			"\t}\n",
-			f->tag, f->name, f->name, w, c);
+			"\t\tn += 4 + o.%s.size() * %d;\n", fn, width(f->type));
 	} else if (f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) {
 		snprintf(b, sizeof(b),
-			"\te.present(%d);\n"
-			"\te.w_bytes(this->%s.data(), this->%s.size());\n",
-			f->tag, f->name, f->name);
+			"\t\tn += 4 + o.%s.size();\n", fn);
 	} else {
-		const char *w = wmethod(f->type);
-		const char *c = ecast(f->type);
 		snprintf(b, sizeof(b),
-			"\te.present(%d);\n"
-			"\te.%s(%sthis->%s);\n",
-			f->tag, w, c, f->name);
+			"\t\tn += %d;\n", width(f->type));
 	}
 	return b;
 }
 
+// ---- per-field body-write statements (cursor-threaded into write_at) ------
 
-// returns the "case TAG: ...; break;" decode statement for one field.
-// Mirrors the reference shape: scalar / array / string / struct / map.
+static std::string
+write_at_stmt(struct zproto_field *f)
+{
+	char b[2048];
+	const char *fn = f->name;
+	if (f->mapkey) {
+		snprintf(b, sizeof(b),
+			"\t\tput_u32(b + cur, (uint32_t)o.%s.size()); cur += 4;\n"
+			"\t\tfor (const auto &kv : o.%s) cur = wire<%s>::write_at(kv.second, buf, cur);\n",
+			fn, fn, qname[f->seminfo].c_str());
+	} else if (f->type == ZPROTO_STRUCT && f->isarray) {
+		snprintf(b, sizeof(b),
+			"\t\tput_u32(b + cur, (uint32_t)o.%s.size()); cur += 4;\n"
+			"\t\tfor (const auto &v : o.%s) cur = wire<%s>::write_at(v, buf, cur);\n",
+			fn, fn, qname[f->seminfo].c_str());
+	} else if (f->type == ZPROTO_STRUCT) {
+		snprintf(b, sizeof(b),
+			"\t\tcur = wire<%s>::write_at(o.%s, buf, cur);\n",
+			qname[f->seminfo].c_str(), fn);
+	} else if ((f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) && f->isarray) {
+		snprintf(b, sizeof(b),
+			"\t\tput_u32(b + cur, (uint32_t)o.%s.size()); cur += 4;\n"
+			"\t\tfor (const auto &v : o.%s) {\n"
+			"\t\t\tput_u32(b + cur, (uint32_t)v.size()); cur += 4;\n"
+			"\t\t\tstd::memcpy(b + cur, v.data(), v.size()); cur += v.size();\n"
+			"\t\t}\n",
+			fn, fn);
+	} else if (f->isarray && f->type == ZPROTO_FLOAT) {
+		snprintf(b, sizeof(b),
+			"\t\tput_u32(b + cur, (uint32_t)o.%s.size()); cur += 4;\n"
+			"\t\tfor (const auto &v : o.%s) { uint32_t _u; std::memcpy(&_u, &v, 4); put_u32(b + cur, _u); cur += 4; }\n",
+			fn, fn);
+	} else if (f->isarray) {
+		snprintf(b, sizeof(b),
+			"\t\tput_u32(b + cur, (uint32_t)o.%s.size()); cur += 4;\n"
+			"\t\tfor (const auto &v : o.%s) { %s(b + cur, %sv); cur += %d; }\n",
+			fn, fn, putfn(f->type), ecast(f->type), width(f->type));
+	} else if (f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) {
+		snprintf(b, sizeof(b),
+			"\t\tput_u32(b + cur, (uint32_t)o.%s.size()); cur += 4;\n"
+			"\t\tstd::memcpy(b + cur, o.%s.data(), o.%s.size()); cur += o.%s.size();\n",
+			fn, fn, fn, fn);
+	} else if (f->type == ZPROTO_FLOAT) {
+		snprintf(b, sizeof(b),
+			"\t\t{ uint32_t _u; std::memcpy(&_u, &o.%s, 4); put_u32(b + cur, _u); } cur += 4;\n", fn);
+	} else {
+		snprintf(b, sizeof(b),
+			"\t\t%s(b + cur, %so.%s); cur += %d;\n",
+			putfn(f->type), ecast(f->type), fn, width(f->type));
+	}
+	return b;
+}
+
+// ---- per-field decode case (switch shape; wire<E>::decode for nested) -----
+
 static std::string
 decode_stmt(struct zproto_field *f)
 {
-	char b[1024];
-	if (f->mapkey) {                         // struct map
+	char b[2048];
+	const char *fn = f->name;
+	if (f->mapkey) {
 		snprintf(b, sizeof(b),
 			"\t\tcase %d: {\n"
 			"\t\t\tuint32_t c = d.r_array();\n"
 			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
 			"\t\t\t\tsize_t n;\n"
 			"\t\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
-			"\t\t\t\tstruct %s t;\n"
-			"\t\t\t\tt._decode(p, n);\n"
-			"\t\t\t\tthis->%s[t.%s] = std::move(t);\n"
+			"\t\t\t\t%s t;\n"
+			"\t\t\t\twire<%s>::decode(t, p, n);\n"
+			"\t\t\t\to.%s[t.%s] = std::move(t);\n"
 			"\t\t\t}\n"
 			"\t\t\tbreak;\n"
 			"\t\t}\n",
-			f->tag, zproto_name(f->seminfo), f->name, f->mapkey->name);
+			f->tag, qname[f->seminfo].c_str(), qname[f->seminfo].c_str(),
+			fn, f->mapkey->name);
 	} else if (f->type == ZPROTO_STRUCT && f->isarray) {
 		snprintf(b, sizeof(b),
 			"\t\tcase %d: {\n"
 			"\t\t\tuint32_t c = d.r_array();\n"
-			"\t\t\tthis->%s.resize(c);\n"
+			"\t\t\to.%s.resize(c);\n"
 			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
 			"\t\t\t\tsize_t n;\n"
 			"\t\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
-			"\t\t\t\tthis->%s[i]._decode(p, n);\n"
+			"\t\t\t\twire<%s>::decode(o.%s[i], p, n);\n"
 			"\t\t\t}\n"
 			"\t\t\tbreak;\n"
 			"\t\t}\n",
-			f->tag, f->name, f->name);
+			f->tag, fn, qname[f->seminfo].c_str(), fn);
 	} else if (f->type == ZPROTO_STRUCT) {
 		snprintf(b, sizeof(b),
 			"\t\tcase %d: {\n"
 			"\t\t\tsize_t n;\n"
 			"\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
-			"\t\t\tthis->%s._decode(p, n);\n"
+			"\t\t\twire<%s>::decode(o.%s, p, n);\n"
 			"\t\t\tbreak;\n"
 			"\t\t}\n",
-			f->tag, f->name);
+			f->tag, qname[f->seminfo].c_str(), fn);
 	} else if ((f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) && f->isarray) {
 		snprintf(b, sizeof(b),
 			"\t\tcase %d: {\n"
 			"\t\t\tuint32_t c = d.r_array();\n"
-			"\t\t\tthis->%s.resize(c);\n"
+			"\t\t\to.%s.resize(c);\n"
 			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
-			"\t\t\t\td.r_bytes(this->%s[i]);\n"
+			"\t\t\t\td.r_bytes(o.%s[i]);\n"
 			"\t\t\t}\n"
 			"\t\t\tbreak;\n"
 			"\t\t}\n",
-			f->tag, f->name, f->name);
+			f->tag, fn, fn);
 	} else if (f->isarray) {
-		const char *w = rmethod(f->type);
 		if (f->type == ZPROTO_BOOLEAN) {
 			snprintf(b, sizeof(b),
 				"\t\tcase %d: {\n"
 				"\t\t\tuint32_t c = d.r_array();\n"
-				"\t\t\tthis->%s.resize(c);\n"
+				"\t\t\to.%s.resize(c);\n"
 				"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
-				"\t\t\t\tthis->%s[i] = (d.r_u8() == 1);\n"
+				"\t\t\t\to.%s[i] = (d.r_u8() == 1);\n"
 				"\t\t\t}\n"
 				"\t\t\tbreak;\n"
 				"\t\t}\n",
-				f->tag, f->name, f->name);
+				f->tag, fn, fn);
 		} else {
-			const char *c = dcast(f->type);
 			snprintf(b, sizeof(b),
 				"\t\tcase %d: {\n"
 				"\t\t\tuint32_t c = d.r_array();\n"
-				"\t\t\tthis->%s.resize(c);\n"
+				"\t\t\to.%s.resize(c);\n"
 				"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
-				"\t\t\t\tthis->%s[i] = %sd.%s();\n"
+				"\t\t\t\to.%s[i] = %sd.%s();\n"
 				"\t\t\t}\n"
 				"\t\t\tbreak;\n"
 				"\t\t}\n",
-				f->tag, f->name, f->name, c, w);
+				f->tag, fn, fn, dcast(f->type), rmethod(f->type));
 		}
 	} else if (f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) {
 		snprintf(b, sizeof(b),
 			"\t\tcase %d:\n"
-			"\t\t\td.r_bytes(this->%s);\n"
+			"\t\t\td.r_bytes(o.%s);\n"
 			"\t\t\tbreak;\n",
-			f->tag, f->name);
+			f->tag, fn);
 	} else if (f->type == ZPROTO_BOOLEAN) {
 		snprintf(b, sizeof(b),
 			"\t\tcase %d:\n"
-			"\t\t\tthis->%s = (d.r_u8() == 1);\n"
+			"\t\t\to.%s = (d.r_u8() == 1);\n"
 			"\t\t\tbreak;\n",
-			f->tag, f->name);
+			f->tag, fn);
 	} else {
-		const char *w = rmethod(f->type);
-		const char *c = dcast(f->type);
 		snprintf(b, sizeof(b),
 			"\t\tcase %d:\n"
-			"\t\t\tthis->%s = %sd.%s();\n"
+			"\t\t\to.%s = %sd.%s();\n"
 			"\t\t\tbreak;\n",
-			f->tag, f->name, c, w);
+			f->tag, fn, dcast(f->type), rmethod(f->type));
 	}
 	return b;
 }
 
-static std::string inline
-reset_normal(struct zproto_field *f)
-{
-	const char *fmt = "";
-	char buff[1024];
-	if (f->isarray) {
-		fmt = "\tthis->%s.clear();\n";
-	} else {
-		switch (f->type) {
-		case ZPROTO_BLOB:
-		case ZPROTO_STRING:
-			fmt = "\tthis->%s.clear();\n";
-			break;
-		case ZPROTO_BOOLEAN:
-			fmt = "\tthis->%s = false;\n";
-			break;
-		case ZPROTO_BYTE:
-		case ZPROTO_SHORT:
-		case ZPROTO_INTEGER:
-		case ZPROTO_LONG:
-		case ZPROTO_UBYTE:
-		case ZPROTO_USHORT:
-		case ZPROTO_UINTEGER:
-		case ZPROTO_ULONG:
-			fmt = "\tthis->%s = 0;\n";
-			break;
-		case ZPROTO_FLOAT:
-			fmt = "\tthis->%s = 0.0f;\n";
-			break;
-		}
-	}
-	snprintf(buff, 1024, fmt, f->name);
-	return buff;
-}
-
-static std::string inline
-reset_struct(struct zproto_field *f)
-{
-	char buff[1024];
-	if (f->isarray)
-		snprintf(buff, 1024, "\tthis->%s.clear();\n", f->name);
-	else
-		snprintf(buff, 1024, "\tthis->%s._reset();\n", f->name);
-	return buff;
-}
-
-// _encode(std::string &) wrapper: construct an encoder over the output
-// string, drive each present field in declaration order, then finish().
-static std::string inline
-format_encode(const char *base, int basetag, int fieldcount)
-{
-	const char *fmt =
-	"int\n"
-	"%s::_encode(std::string &out) const\n"
-	"{\n"
-	"\tzprotobuf::encoder e(out, %d, %d);\n";
-	char buff[256];
-	snprintf(buff, sizeof(buff), fmt, base, basetag, fieldcount);
-	return buff;
-}
-
-static std::string inline
-format_encode_close()
-{
-	return "\treturn e.finish();\n}\n";
-}
-
-// _decode(const uint8_t *, size_t) wrapper: construct a decoder, loop
-// next(tag), switch on tag reading each field, default stops.
-static std::string inline
-format_decode(const char *base, int basetag)
-{
-	const char *fmt =
-	"int\n"
-	"%s::_decode(const uint8_t *data, size_t sz)\n"
-	"{\n"
-	"\tzprotobuf::decoder d(data, sz, %d);\n"
-	"\tfor (int tag; d.next(tag); ) {\n"
-	"\t\tswitch (tag) {\n";
-	char buff[256];
-	snprintf(buff, sizeof(buff), fmt, base, basetag);
-	return buff;
-}
-
-static std::string inline
-format_decode_close()
-{
-	// unknown tag -> return 0 (forward-compat stop); full message ->
-	// d.size() (SIZEOF_LEN + datasize, matching zproto_decode's return).
-	return "\t\tdefault:\n\t\t\treturn 0;\n\t\t}\n\t}\n\treturn (int)d.size();\n}\n";
-}
-
-static std::string inline
-format_reset(const char *base)
-{
-	const char *fmt =
-	"void\n"
-	"%s::_reset()\n"
-	"{\n";
-	char buff[1024];
-	snprintf(buff, 1024, fmt, base);
-	return buff;
-}
-
-
-static std::string inline
-format_name(const char *base)
-{
-	const char *fmt =
-	"const char *\n"
-	"%s::_name() const\n"
-	"{\n"
-	"\treturn \"%s\";\n"
-	"}\n";
-
-	char buff[1024];
-	snprintf(buff, 1024, fmt, base, base);
-	return buff;
-}
-
-static std::string inline
-format_tag(const char *base, int tag)
-{
-	const char *fmt =
-	"int\n"
-	"%s::_tag() const\n"
-	"{\n"
-	"\treturn 0x%X;\n"
-	"}\n";
-	char buff[1024];
-	snprintf(buff, 1024, fmt, base, tag);
-	return buff;
-}
-
-static int prototype_cb(struct zproto_field *f, struct stmt_args *ud);
-
+// emit one wire<T> specialization: tag/name (tagged structs only) + byte_size +
+// write_at + encode + decode.
 static void
-formatst(struct zproto *z, struct zproto_struct *st, struct stmt_args &newargs)
+emit_struct(FILE *fp, struct zproto_struct *st)
 {
-	struct zproto_struct *const*start, *const*end;
-	const struct zproto_starray *sts;
-	sts = (st == NULL) ? zproto_root(z) : st->child;
+	const std::string &Q = qname[st];
+	int fc = st->fieldcount;
+	// byte_size only reads o when some field is variable-size (string/blob/
+	// array/struct); fixed-scalar structs leave the param unnamed (matches the
+	// hand-written prototype and keeps production builds warning-free).
+	bool byte_uses_o = false;
+	for (int i = 0; i < fc; i++) {
+		struct zproto_field *f = st->fields[i];
+		if (f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB ||
+		    f->isarray || f->type == ZPROTO_STRUCT)
+			byte_uses_o = true;
+	}
+	bool body_uses_o = (fc > 0);   // write_at / decode touch o on every field
+
+	fprintf(fp, "template<> struct wire<%s> {\n", Q.c_str());
+	if (st->tag != 0) {
+		fprintf(fp, "\tstatic constexpr int tag() { return 0x%X; }\n", zproto_tag(st));
+		fprintf(fp, "\tstatic constexpr const char *name() { return \"%s\"; }\n", zproto_name(st));
+	}
+
+	// byte_size: full message size incl. the 4-byte datasize prefix.
+	//   6 + fc*2 = datasize(4) + tagcount(2) + fc delta slots.
+	fprintf(fp, "\tstatic size_t byte_size(const %s &%s) {\n", Q.c_str(), byte_uses_o ? "o" : "");
+	fprintf(fp, "\t\tsize_t n = 6 + %d * 2;\n", fc);
+	for (int i = 0; i < fc; i++)
+		fprintf(fp, "%s", byte_size_stmt(st->fields[i]).c_str());
+	fprintf(fp, "\t\treturn n;\n");
+	fprintf(fp, "\t}\n");
+
+	// write_at: [u32 datasize][u16 tagcount][fc*u16 delta][body], then patch
+	// datasize. deltas are precomputed (basetag-1 is the implicit prev for the
+	// first field, so its delta is always 0).
+	fprintf(fp, "\tstatic size_t write_at(const %s &%s, Buffer &buf, size_t cur) {\n", Q.c_str(), body_uses_o ? "o" : "");
+	fprintf(fp, "\t\tchar *b = buf.data();\n");
+	fprintf(fp, "\t\tsize_t start = cur;\n");
+	fprintf(fp, "\t\tcur += 4;\n");
+	fprintf(fp, "\t\tput_u16(b + cur, (uint16_t)%d); cur += 2;\n", fc);
+	for (int i = 0; i < fc; i++) {
+		int prev = (i == 0) ? (st->basetag - 1) : st->fields[i - 1]->tag;
+		int delta = st->fields[i]->tag - prev - 1;
+		fprintf(fp, "\t\tput_u16(b + cur, (uint16_t)%d); cur += 2;\n", delta);
+	}
+	for (int i = 0; i < fc; i++)
+		fprintf(fp, "%s", write_at_stmt(st->fields[i]).c_str());
+	fprintf(fp, "\t\tput_u32(b + start, (uint32_t)(cur - start - 4));\n");
+	fprintf(fp, "\t\treturn cur;\n");
+	fprintf(fp, "\t}\n");
+
+	// encode: resize once to the exact size, then write_at at the tail.
+	fprintf(fp, "\tstatic void encode(const %s &o, Buffer &buf) {\n", Q.c_str());
+	fprintf(fp, "\t\tsize_t off = buf.size();\n");
+	fprintf(fp, "\t\tbuf.resize(off + byte_size(o));\n");
+	fprintf(fp, "\t\twrite_at(o, buf, off);\n");
+	fprintf(fp, "\t}\n");
+
+	// decode: drive the schema-agnostic decoder; switch on the recovered tag.
+	// unknown tag -> stop (forward-compat).
+	fprintf(fp, "\tstatic void decode(%s &%s, const uint8_t *data, size_t sz) {\n", Q.c_str(), body_uses_o ? "o" : "");
+	fprintf(fp, "\t\tdecoder d(data, sz, %d);\n", st->basetag);
+	fprintf(fp, "\t\tfor (int tag; d.next(tag); ) {\n");
+	fprintf(fp, "\t\t\tswitch (tag) {\n");
+	for (int i = 0; i < fc; i++)
+		fprintf(fp, "%s", decode_stmt(st->fields[i]).c_str());
+	fprintf(fp, "\t\t\tdefault:\n");
+	fprintf(fp, "\t\t\t\treturn;\n");
+	fprintf(fp, "\t\t\t}\n");
+	fprintf(fp, "\t\t}\n");
+	fprintf(fp, "\t}\n");
+
+	fprintf(fp, "};\n\n");
+}
+
+// emit every struct's specialization in post-order (children before parent),
+// matching header.cpp's nesting so a referenced wire<E> precedes wire<X>.
+static void
+dump_struct(FILE *fp, struct zproto_struct *st)
+{
+	const struct zproto_starray *sts = st->child;
 	if (sts != NULL) {
-		start = &sts->buf[0];
-		end = start + sts->count;
-		while (start < end) {
-			struct zproto_struct *child = *start;
-			struct stmt_args nnewargs;
-			assert(protocol.count(child) == 0);
-			assert(defined.count(child) == 0);
-			nnewargs.base = newargs.base;
-			nnewargs.base += "::";
-			nnewargs.base += zproto_name(child);
-			formatst(z, child, nnewargs);
-			newargs.stmts.insert(newargs.stmts.end(),
-					nnewargs.stmts.begin(),
-					nnewargs.stmts.end());
-			++start;
-		}
+		for (int i = 0; i < sts->count; i++)
+			dump_struct(fp, sts->buf[i]);
 	}
-	for (int i = 0; i < st->fieldcount; i++) {
-		prototype_cb(st->fields[i], &newargs);
-	}
-	std::string tmp;
-
-	if (protocol.count(st)) {
-		//_tag()
-		tmp = format_tag(newargs.base.c_str(), zproto_tag(st));
-		newargs.stmts.push_back(tmp);
-		//_name()
-		tmp = format_name(newargs.base.c_str());
-		newargs.stmts.push_back(tmp);
-	}
-	//_reset()
-	tmp = format_reset(newargs.base.c_str());
-	newargs.resetstm.insert(newargs.resetstm.begin(), tmp);
-	newargs.resetstm.push_back("\n}\n");
-	newargs.stmts.insert(newargs.stmts.end(), newargs.resetstm.begin(),
-			newargs.resetstm.end());
-	//_encode(std::string &)
-	tmp = format_encode(newargs.base.c_str(), st->basetag, st->fieldcount);
-	newargs.encodestm.insert(newargs.encodestm.begin(), tmp);
-	newargs.stmts.insert(newargs.stmts.end(), newargs.encodestm.begin(),
-			newargs.encodestm.end());
-	tmp = format_encode_close();
-	newargs.stmts.push_back(tmp);
-	//_decode(const uint8_t *, size_t)
-	tmp = format_decode(newargs.base.c_str(), st->basetag);
-	newargs.decodestm.insert(newargs.decodestm.begin(), tmp);
-	newargs.stmts.insert(newargs.stmts.end(), newargs.decodestm.begin(),
-			newargs.decodestm.end());
-	tmp = format_decode_close();
-	newargs.stmts.push_back(tmp);
-	//
-	defined.insert(st);
-	return ;
-}
-
-static int
-prototype_cb(struct zproto_field *f, struct stmt_args *ud)
-{
-	std::string estm;
-	std::string dstm;
-	std::string rstm;
-
-	switch (f->type) {
-	case ZPROTO_STRUCT:
-		estm = encode_stmt(f);
-		dstm = decode_stmt(f);
-		rstm = reset_struct(f);
-		break;
-	case ZPROTO_BLOB:
-	case ZPROTO_STRING:
-	case ZPROTO_BOOLEAN:
-	case ZPROTO_FLOAT:
-	case ZPROTO_BYTE:
-	case ZPROTO_SHORT:
-	case ZPROTO_INTEGER:
-	case ZPROTO_LONG:
-	case ZPROTO_UBYTE:
-	case ZPROTO_USHORT:
-	case ZPROTO_UINTEGER:
-	case ZPROTO_ULONG:
-		estm = encode_stmt(f);
-		dstm = decode_stmt(f);
-		rstm = reset_normal(f);
-		break;
-	default:
-		break;
-	}
-	ud->encodestm.push_back(estm);
-	ud->decodestm.push_back(dstm);
-	ud->resetstm.push_back(rstm);
-	return 0;
-}
-
-static void
-dump_vecstring(FILE *fp, const std::vector<std::string> &tbl)
-{
-	for (const auto &str:tbl)
-		fprintf(fp, "%s", str.c_str());
-	return;
-}
-
-static void
-dumpst(FILE *fp, struct zproto *z)
-{
-	struct zproto_struct *const* start, *const* end;
-	const struct zproto_starray *sts;
-	sts = zproto_root(z);
-	if (sts == NULL)
-		return ;
-	start = &sts->buf[0];
-	end = start + sts->count;
-	while (start < end) {
-		struct stmt_args args;
-		struct zproto_struct *st = *start;
-		args.base = zproto_name(st);
-		formatst(z, st, args);
-		dump_vecstring(fp, args.stmts);
-		++start;
-	}
-	return ;
+	emit_struct(fp, st);
 }
 
 void
-body(const char *name, std::vector<const char*> &space, const char * /*proto*/, struct zproto *z)
+body(const char *name, std::vector<const char *> &space, const char * /*proto*/, struct zproto *z)
 {
 	FILE *fp;
 	std::string path = name;
-	path += ".cc";
+	path += ".wire.hpp";
 	fp = fopen(path.c_str(), "wb+");
-
-	const struct zproto_starray *sts = zproto_root(z);
-	if (sts != NULL) {
-		struct zproto_struct *const* start, *const* end;
-		start = &sts->buf[0];
-		end = start + sts->count;
-		while (start < end) {
-			struct zproto_struct *st = *start;
-			protocol.insert(st);
-			++start;
-		}
+	if (fp == NULL) {
+		perror(path.c_str());
+		return;
 	}
 
-	fprintf(fp, "#include <string.h>\n");
-	fprintf(fp, "#include \"zprotowire.h\"\n");
+	// namespace prefix for fully-qualified type names. the leading "struct " is an
+	// elaborated-type-specifier: it forces type lookup so a field that shares its
+	// name with a nested struct type (e.g. schema `.phone:phone[home]` -> a member
+	// named phone and a nested struct phone) resolves to the type, not the member.
+	std::string ns;
+	for (const auto p : space) {
+		ns += "::";
+		ns += p;
+	}
+	qualprefix = ns.empty() ? "struct ::" : ("struct " + ns + "::");
+
+	// collect qualified names for every struct (roots + nested).
+	const struct zproto_starray *sts = zproto_root(z);
+	if (sts != NULL) {
+		for (int i = 0; i < sts->count; i++)
+			collect(sts->buf[i], zproto_name(sts->buf[i]));
+	}
+
+	fprintf(fp, "#pragma once\n");
 	fprintf(fp, "#include \"%s.hpp\"\n", name);
-	for (const auto p:space)
-		fprintf(fp, "namespace %s {\n", p);
-	fprintf(fp, "%s", "\nusing namespace zprotobuf;\n\n");
-	dumpst(fp, z);
-	for (size_t i = 0; i < space.size(); i++)
-		fprintf(fp, "}");
+	fprintf(fp, "#include \"zprotowire.hpp\"\n");
+	fprintf(fp, "#include <cstring>\n");
+	fprintf(fp, "#include <utility>\n");
 	fprintf(fp, "\n");
+	fprintf(fp, "namespace zproto {\n\n");
+	if (sts != NULL) {
+		for (int i = 0; i < sts->count; i++)
+			dump_struct(fp, sts->buf[i]);
+	}
+	fprintf(fp, "}  // namespace zproto\n");
 	fclose(fp);
 }
