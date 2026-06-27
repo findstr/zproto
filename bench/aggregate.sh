@@ -31,5 +31,5 @@ awk -F, '$1!="cpp"{next}
 	$4!="pb"{zt[m"@"$3]=$6}
 	$4=="pb" && $3=="marshal"   {pp[m"@encode"]=$6;      pp[m"@encode_pack"]=$6}
 	$4=="pb" && $3=="unmarshal" {pp[m"@decode"]=$6;      pp[m"@unpack_decode"]=$6}
-	END{for(k in zt) printf "| %s | %s | %s |\n", k, zt[k], pp[k]}' \
-	< <(cat "$DIR"/*.csv 2>/dev/null || true)
+	END{for(k in zt) { split(k, a, "@"); printf "| %s | %s | %s | %s |\n", a[1], a[2], zt[k], pp[k] } }' \
+	< <(cat "$DIR"/*.csv 2>/dev/null || true) | sort
