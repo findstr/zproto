@@ -6,7 +6,7 @@ message Item { uint32 id = 1; uint32 count = 2; }
 message Attr { string key = 1; string val = 2; }
 message Nest { int32 x = 1; int32 y = 2; }
 message Mapi { int32 v = 1; }            // key lifted to map<int32,Mapi>
-message Mapf { int32 v = 1; }            // zproto uses a float key (kf); proto3 forbids float map keys, so pb keys by int32
+message Mapf { float fv = 1; }           // int32 key (lifted); value carries the float — matches zproto mapf{k:integer, fv:float}
 
 message Heartbeat { uint32 seq = 1; uint32 ack = 2; }
 message Frame {

@@ -27,8 +27,8 @@ mapi {
 	.v:integer 2
 }
 mapf {
-	.kf:float 1
-	.v:integer 2
+	.k:integer 1
+	.fv:float 2
 }
 
 heartbeat 0x01 {
@@ -87,7 +87,7 @@ alltypes 0xFF {
 	.nest_n:nest 17
 	.nest_na:nest[] 18
 	.m_int:mapi[k] 19
-	.m_float:mapf[kf] 20
+	.m_float:mapf[k] 20
 	.aempty:integer[] 21
 	.asingle:integer[] 22
 }

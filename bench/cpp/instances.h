@@ -44,10 +44,10 @@ inline void fill(bench::alltypes &m) {
 	m.abool.resize(64); for (int i = 0; i < 64; i++) m.abool[i] = (i % 2);
 	m.nest_n.x = 1; m.nest_n.y = 2;
 	m.nest_na.resize(32); for (int i = 0; i < 32; i++) { m.nest_na[i].x = i; m.nest_na[i].y = -i; }
-	// mapi/mapf values carry their key field (.k / .kf); set it to match the
+	// mapi/mapf values carry their key field (.k); set it to match the
 	// external map key so decode re-inserts under the same key (see snapshot).
 	for (int k = 0; k < 50; k++) { m.m_int[k].k = k; m.m_int[k].v = k; }
-	for (int k = 0; k < 50; k++) { float kf = (float)k + 0.5f; m.m_float[kf].kf = kf; m.m_float[kf].v = k; }
+	for (int k = 0; k < 50; k++) { m.m_float[k].k = k; m.m_float[k].fv = (float)k + 0.5f; }
 	m.aempty.clear();
 	m.asingle = {7};
 }

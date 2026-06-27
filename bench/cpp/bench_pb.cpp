@@ -39,7 +39,7 @@ static void fill(Alltypes &m) {
 	m.mutable_nest_n()->set_x(1); m.mutable_nest_n()->set_y(2);
 	for (int i = 0; i < 32; i++) { auto *n = m.add_nest_na(); n->set_x(i); n->set_y(-i); }
 	for (int k = 0; k < 50; k++) (*m.mutable_m_int())[k].set_v(k);
-	for (int k = 0; k < 50; k++) { (*m.mutable_m_float())[k].set_v(k); }
+	for (int k = 0; k < 50; k++) { (*m.mutable_m_float())[k].set_fv((float)k + 0.5f); }
 	m.add_asingle(7);
 }
 
