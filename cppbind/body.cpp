@@ -122,7 +122,7 @@ encode_stmt(struct zproto_field *f)
 		snprintf(b, sizeof(b),
 			"\te.present(%d);\n"
 			"\te.w_array((uint32_t)this->%s.size());\n"
-			"\tfor (auto &kv : this->%s) {\n"
+			"\tfor (const auto &kv : this->%s) {\n"
 			"\t\tkv.second._encode(out);\n"
 			"\t}\n",
 			f->tag, f->name, f->name);
@@ -130,7 +130,7 @@ encode_stmt(struct zproto_field *f)
 		snprintf(b, sizeof(b),
 			"\te.present(%d);\n"
 			"\te.w_array((uint32_t)this->%s.size());\n"
-			"\tfor (auto &v : this->%s) {\n"
+			"\tfor (const auto &v : this->%s) {\n"
 			"\t\tv._encode(out);\n"
 			"\t}\n",
 			f->tag, f->name, f->name);
@@ -143,7 +143,7 @@ encode_stmt(struct zproto_field *f)
 		snprintf(b, sizeof(b),
 			"\te.present(%d);\n"
 			"\te.w_array((uint32_t)this->%s.size());\n"
-			"\tfor (auto &v : this->%s) {\n"
+			"\tfor (const auto &v : this->%s) {\n"
 			"\t\te.w_bytes(v.data(), v.size());\n"
 			"\t}\n",
 			f->tag, f->name, f->name);
@@ -153,7 +153,7 @@ encode_stmt(struct zproto_field *f)
 		snprintf(b, sizeof(b),
 			"\te.present(%d);\n"
 			"\te.w_array((uint32_t)this->%s.size());\n"
-			"\tfor (auto &v : this->%s) {\n"
+			"\tfor (const auto &v : this->%s) {\n"
 			"\t\te.%s(%sv);\n"
 			"\t}\n",
 			f->tag, f->name, f->name, w, c);
