@@ -29,6 +29,7 @@ echo "|---|---|---:|---:|"
 awk -F, '$1!="cpp"{next}
 	{m=tolower($2)}
 	$4!="pb"{zt[m"@"$3]=$6}
-	$4=="pb"{pp[m"@"($3=="unmarshal"?"unpack_decode":($3=="marshal"?"encode_pack":"encode"))]=$6}
+	$4=="pb" && $3=="marshal"   {pp[m"@encode"]=$6;      pp[m"@encode_pack"]=$6}
+	$4=="pb" && $3=="unmarshal" {pp[m"@decode"]=$6;      pp[m"@unpack_decode"]=$6}
 	END{for(k in zt) printf "| %s | %s | %s |\n", k, zt[k], pp[k]}' \
 	< <(cat "$DIR"/*.csv 2>/dev/null || true)
