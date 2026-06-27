@@ -1,0 +1,35 @@
+syntax = "proto3";
+package benchpb;
+
+message Vec3 { float x = 1; float y = 2; float z = 3; }
+message Item { uint32 id = 1; uint32 count = 2; }
+message Attr { string key = 1; string val = 2; }
+message Nest { int32 x = 1; int32 y = 2; }
+message Mapi { int32 v = 1; }            // key lifted to map<int32,Mapi>
+message Mapf { int32 v = 1; }            // key lifted to map<float,Mapf>
+
+message Heartbeat { uint32 seq = 1; uint32 ack = 2; }
+message Frame {
+	uint64 eid = 1; float x = 2; float y = 3; float z = 4; float yaw = 5; uint32 seq = 6;
+}
+message Login {
+	uint64 userid = 1; string token = 2; uint32 version = 3; uint32 platform = 4;
+}
+message Chat {
+	uint64 from = 1; uint64 to = 2; string text = 3; uint64 ts = 4; repeated Attr attrs = 5;
+}
+message Snapshot {
+	uint64 userid = 1; Vec3 pos = 2; int32 hp = 3; int32 mp = 4;
+	repeated Item inventory = 5; repeated int32 buffs = 6; repeated bool flags = 7;
+	map<int32, Mapi> friends = 8;   // value carries level only; key=userid
+	uint32 level = 9;
+}
+message Alltypes {
+	bool b = 1; int32 i8 = 2; uint32 u8 = 3; int32 i16 = 4; uint32 u16 = 5;
+	int32 i32 = 6; uint32 u32 = 7; int64 i64 = 8; uint64 u64 = 9; float f = 10;
+	string s = 11; bytes bl = 12;
+	repeated int32 ai32 = 13; repeated string as = 14; repeated bytes abl = 15; repeated bool abool = 16;
+	Nest nest_n = 17; repeated Nest nest_na = 18;
+	map<int32, Mapi> m_int = 19; map<float, Mapf> m_float = 20;
+	repeated int32 aempty = 21; repeated int32 asingle = 22;
+}

@@ -1,0 +1,93 @@
+# zproto benchmark & conformance schema. Helpers first (untagged), then
+# protocol messages (tagged). Element counts/values fixed per the spec §1.
+
+vec3 {
+	.x:float 1
+	.y:float 2
+	.z:float 3
+}
+item {
+	.id:uinteger 1
+	.count:uinteger 2
+}
+playerlevel {
+	.userid:ulong 1
+	.level:uinteger 2
+}
+attr {
+	.key:string 1
+	.val:string 2
+}
+nest {
+	.x:integer 1
+	.y:integer 2
+}
+mapi {
+	.k:integer 1
+	.v:integer 2
+}
+mapf {
+	.kf:float 1
+	.v:integer 2
+}
+
+heartbeat 0x01 {
+	.seq:uinteger 1
+	.ack:uinteger 2
+}
+frame 0x10 {
+	.eid:ulong 1
+	.x:float 2
+	.y:float 3
+	.z:float 4
+	.yaw:float 5
+	.seq:uinteger 6
+}
+login 0x20 {
+	.userid:ulong 1
+	.token:string 2
+	.version:uinteger 3
+	.platform:ubyte 4
+}
+chat 0x30 {
+	.from:ulong 1
+	.to:ulong 2
+	.text:string 3
+	.ts:ulong 4
+	.attrs:attr[] 5
+}
+snapshot 0x40 {
+	.userid:ulong 1
+	.pos:vec3 2
+	.hp:integer 3
+	.mp:integer 4
+	.inventory:item[] 5
+	.buffs:integer[] 6
+	.flags:boolean[] 7
+	.friends:playerlevel[userid] 8
+	.level:uinteger 9
+}
+alltypes 0xFF {
+	.b:boolean 1
+	.i8:byte 2
+	.u8:ubyte 3
+	.i16:short 4
+	.u16:ushort 5
+	.i32:integer 6
+	.u32:uinteger 7
+	.i64:long 8
+	.u64:ulong 9
+	.f:float 10
+	.s:string 11
+	.bl:blob 12
+	.ai32:integer[] 13
+	.as:string[] 14
+	.abl:blob[] 15
+	.abool:boolean[] 16
+	.nest_n:nest 17
+	.nest_na:nest[] 18
+	.m_int:mapi[k] 19
+	.m_float:mapf[kf] 20
+	.aempty:integer[] 21
+	.asingle:integer[] 22
+}
