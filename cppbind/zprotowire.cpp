@@ -1,34 +1,9 @@
+#include "zprotowire.hpp"
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
-#include <string>
-#include "zprotowire.h"
 
-namespace zprotobuf {
-
-void wire::_reset() {
-	//empty
-}
-
-int wire::_encode(std::string &) const {
-	return ZPROTO_ERR_ERROR;
-}
-
-int wire::_decode(const uint8_t *, size_t) {
-	return ZPROTO_ERR_ERROR;
-}
-
-int wire::_decode(const std::string &dat) {
-	return _decode((const uint8_t *)dat.data(), dat.size());
-}
-
-int wirep::_pack(const uint8_t *src, int srcsz, std::string &dat) {
-	return pack(src, srcsz, dat);
-}
-
-int wirep::_unpack(const uint8_t *src, int srcsz, std::string &dat) {
-	return unpack(src, srcsz, dat);
-}
+namespace zproto {
 
 // ---- zero-suppression codec, ported from zproto.c (schema-independent) ----
 
@@ -178,107 +153,6 @@ int unpack(const uint8_t *src, int srcsz, std::string &dst) {
 	dst.clear();
 	dst.reserve(srcsz);                // reserve packed input size
 	return unpack_impl(src, srcsz, dst);
-}
-
-// ---- little-endian byte primitives ----
-static inline void put_u16(std::string &o, uint16_t v) {
-	o.push_back((char)(v & 0xff));
-	o.push_back((char)((v >> 8) & 0xff));
-}
-
-static inline void put_u32(std::string &o, uint32_t v) {
-	o.push_back((char)(v & 0xff));
-	o.push_back((char)((v >> 8) & 0xff));
-	o.push_back((char)((v >> 16) & 0xff));
-	o.push_back((char)((v >> 24) & 0xff));
-}
-
-static inline void put_u64(std::string &o, uint64_t v) {
-	int i;
-	for (i = 0; i < 8; i++) {
-		o.push_back((char)(v & 0xff));
-		v >>= 8;
-	}
-}
-
-static inline void put_u16_at(std::string &o, size_t off, uint16_t v) {
-	o[off]     = (char)(v & 0xff);
-	o[off + 1] = (char)((v >> 8) & 0xff);
-}
-
-static inline void put_u32_at(std::string &o, size_t off, uint32_t v) {
-	o[off]     = (char)(v & 0xff);
-	o[off + 1] = (char)((v >> 8) & 0xff);
-	o[off + 2] = (char)((v >> 16) & 0xff);
-	o[off + 3] = (char)((v >> 24) & 0xff);
-}
-
-encoder::encoder(std::string &out, int basetag, int fieldcount)
-	: out(out), last_tag(basetag - 1), present_count(0) {
-	tag_count_off = out.size();
-	put_u32(out, 0);                  // datasize placeholder
-	put_u16(out, 0);                  // tagcount placeholder
-	tag_off = out.size();             // first delta slot
-	for (int i = 0; i < fieldcount; i++) {
-		put_u16(out, 0);              // reserve max delta slots
-	}
-	body_off = out.size();
-}
-
-void encoder::present(int tag) {
-	put_u16_at(out, tag_off, (uint16_t)(tag - last_tag - 1));
-	tag_off += 2;
-	last_tag = tag;
-	present_count++;
-}
-
-void encoder::w_u8(uint8_t v) {
-	out.push_back((char)v);
-}
-
-void encoder::w_u16(uint16_t v) {
-	put_u16(out, v);
-}
-
-void encoder::w_u32(uint32_t v) {
-	put_u32(out, v);
-}
-
-void encoder::w_u64(uint64_t v) {
-	put_u64(out, v);
-}
-
-void encoder::w_f32(float v) {
-	uint32_t u;
-	memcpy(&u, &v, 4);
-	put_u32(out, u);
-}
-
-void encoder::w_bytes(const char *p, size_t n) {
-	put_u32(out, (uint32_t)n);
-	out.append(p, n);
-}
-
-void encoder::w_array(uint32_t count) {
-	put_u32(out, count);
-}
-
-int encoder::finish() {
-	try {
-		put_u16_at(out, tag_count_off + 4, (uint16_t)present_count);  // tagcount slot
-		size_t used_tag_end = tag_off;
-		size_t body_size = out.size() - body_off;
-		size_t compact_body_off = used_tag_end;
-		if (compact_body_off != body_off) {
-			memmove(&out[compact_body_off], &out[body_off], body_size);
-			out.resize(compact_body_off + body_size);
-		}
-		uint32_t datasize = (uint32_t)((compact_body_off - (tag_count_off + 4)) + body_size);
-		put_u32_at(out, tag_count_off, datasize);
-		return (int)(4 + datasize);
-	} catch (const std::bad_alloc &) {
-		return ZPROTO_ERR_OOM;
-	}
 }
 
 // ---- schema-agnostic wire decoder (mirrors zproto.c zproto_decode) ----
@@ -439,4 +313,4 @@ const uint8_t *decoder::struct_bytes(size_t &n) {
 	return start;
 }
 
-}
+}  // namespace zproto
