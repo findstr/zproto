@@ -68,7 +68,7 @@ int main(void) {
 		}
 	}
 	fclose(fp);
-	if (fail) { fprintf(stderr, "CODEC CONFERENCE FAILED: %d\n", fail); return 1; }
+	if (fail) { fprintf(stderr, "CODEC CONFORMANCE FAILED: %d\n", fail); return 1; }
 	printf("CODEC CONFORMANCE OK (%zu vectors, byte-exact)\n", n);
 	return 0;
 }
