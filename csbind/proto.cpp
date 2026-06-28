@@ -7,7 +7,9 @@
 #include <string.h>
 #include <unordered_set>
 #include <sys/stat.h>
-#include "zproto.hpp"
+extern "C" {
+#include "zproto.h"
+}
 #include "body.h"
 
 static inline void

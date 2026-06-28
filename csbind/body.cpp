@@ -4,7 +4,9 @@
 #include <sstream>
 #include <unordered_set>
 
-#include "zproto.hpp"
+extern "C" {
+#include "zproto.h"
+}
 
 static std::unordered_set<struct zproto_struct *>	protocol;
 static std::unordered_set<struct zproto_struct *>	defined;
