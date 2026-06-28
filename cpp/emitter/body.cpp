@@ -289,6 +289,8 @@ decode_stmt(struct zproto_field *f)
 			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
 			"\t\t\t\tsize_t n;\n"
 			"\t\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
+			"\t\t\t\tif (!d.ok)\n"
+			"\t\t\t\t\tbreak;\n"
 			"\t\t\t\t%s t;\n"
 			"\t\t\t\tmessage<%s>::decode(t, p, n);\n"
 			"\t\t\t\to.%s[t.%s] = std::move(t);\n"
@@ -301,15 +303,18 @@ decode_stmt(struct zproto_field *f)
 		snprintf(b, sizeof(b),
 			"\t\tcase %d: {\n"
 			"\t\t\tuint32_t c = d.r_array();\n"
-			"\t\t\to.%s.resize(c);\n"
 			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
 			"\t\t\t\tsize_t n;\n"
 			"\t\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
-			"\t\t\t\tmessage<%s>::decode(o.%s[i], p, n);\n"
+			"\t\t\t\tif (!d.ok)\n"
+			"\t\t\t\t\tbreak;\n"
+			"\t\t\t\t%s t;\n"
+			"\t\t\t\tmessage<%s>::decode(t, p, n);\n"
+			"\t\t\t\to.%s.push_back(std::move(t));\n"
 			"\t\t\t}\n"
 			"\t\t\tbreak;\n"
 			"\t\t}\n",
-			f->tag, fn, qname[f->seminfo].c_str(), fn);
+			f->tag, qname[f->seminfo].c_str(), qname[f->seminfo].c_str(), fn);
 	} else if (f->type == ZPROTO_STRUCT) {
 		snprintf(b, sizeof(b),
 			"\t\tcase %d: {\n"
@@ -323,36 +328,43 @@ decode_stmt(struct zproto_field *f)
 		snprintf(b, sizeof(b),
 			"\t\tcase %d: {\n"
 			"\t\t\tuint32_t c = d.r_array();\n"
-			"\t\t\to.%s.resize(c);\n"
 			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
-			"\t\t\t\td.r_bytes(o.%s[i]);\n"
+			"\t\t\t\tstd::string s;\n"
+			"\t\t\t\td.r_bytes(s);\n"
+			"\t\t\t\tif (!d.ok)\n"
+			"\t\t\t\t\tbreak;\n"
+			"\t\t\t\to.%s.push_back(std::move(s));\n"
 			"\t\t\t}\n"
 			"\t\t\tbreak;\n"
 			"\t\t}\n",
-			f->tag, fn, fn);
+			f->tag, fn);
 	} else if (f->isarray) {
 		if (f->type == ZPROTO_BOOLEAN) {
 			snprintf(b, sizeof(b),
 				"\t\tcase %d: {\n"
 				"\t\t\tuint32_t c = d.r_array();\n"
-				"\t\t\to.%s.resize(c);\n"
 				"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
-				"\t\t\t\to.%s[i] = (d.r_u8() == 1);\n"
+				"\t\t\t\tuint8_t v = d.r_u8();\n"
+				"\t\t\t\tif (!d.ok)\n"
+				"\t\t\t\t\tbreak;\n"
+				"\t\t\t\to.%s.push_back(v == 1);\n"
 				"\t\t\t}\n"
 				"\t\t\tbreak;\n"
 				"\t\t}\n",
-				f->tag, fn, fn);
+				f->tag, fn);
 		} else {
 			snprintf(b, sizeof(b),
 				"\t\tcase %d: {\n"
 				"\t\t\tuint32_t c = d.r_array();\n"
-				"\t\t\to.%s.resize(c);\n"
 				"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
-				"\t\t\t\to.%s[i] = %sd.%s();\n"
+				"\t\t\t\tauto v = %sd.%s();\n"
+				"\t\t\t\tif (!d.ok)\n"
+				"\t\t\t\t\tbreak;\n"
+				"\t\t\t\to.%s.push_back(v);\n"
 				"\t\t\t}\n"
 				"\t\t\tbreak;\n"
 				"\t\t}\n",
-				f->tag, fn, fn, dcast(f->type), rmethod(f->type));
+				f->tag, dcast(f->type), rmethod(f->type), fn);
 		}
 	} else if (f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) {
 		snprintf(b, sizeof(b),

@@ -201,11 +201,58 @@ static void test_decoder() {
     printf("test_decoder ok\n");
 }
 
+// Decode of an array whose wire count is inflated far past the actual data must
+// NOT allocate proportionally to the claimed count (memory-amplification / OOM
+// defense). The decoder underruns once the real elements run out; the array must
+// end up holding only what was actually decodable, not the (untrusted) count.
+static void test_array_oom_defense() {
+    // hand-built packet wire: a single field (luck, tag 4). packet basetag is 1,
+    // so a delta of 3 recovers tag = 1 + 3 = 4. The count is forged to 1000 but
+    // only two int64 elements follow -- the decode must stop at 2, not reserve
+    // 1000 and fill the rest with zeros.
+    static const uint8_t buf[] = {
+        0x18, 0x00, 0x00, 0x00,                                       // [u32 datasize = 24]
+        0x01, 0x00,                                                   // [u16 tagcount = 1]
+        0x03, 0x00,                                                   // [u16 delta = 3] -> tag 4
+        0xe8, 0x03, 0x00, 0x00,                                       // [u32 count = 1000] (forged)
+        0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,              // [u64 3]
+        0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,              // [u64 7]
+    };
+    hello::world::packet pb;
+    message<hello::world::packet>::decode(pb, buf, sizeof(buf));
+    assert(pb.luck.size() == 2);
+    assert(pb.luck[0] == 3);
+    assert(pb.luck[1] == 7);
+    printf("test_array_oom_defense ok\n");
+}
+
+// Same memory-amplification root cause, map flavor. The map is memory-safe (no
+// reserve; on underrun every iteration inserts at the same default key, so the
+// map dedups and never balloons), BUT the inner loop is still bounded by the
+// untrusted count with no ok-bail, so a forged huge count makes it spin and
+// leaves one spurious default-key entry. Assert the map stays empty.
+static void test_map_oom_defense() {
+    // hand-built packet wire: one field (phone map, tag 1). basetag=1 -> delta=0.
+    // count is forged to 1000 but no struct elements follow.
+    static const uint8_t buf[] = {
+        0x08, 0x00, 0x00, 0x00,          // [u32 datasize = 8]
+        0x01, 0x00,                      // [u16 tagcount = 1]
+        0x00, 0x00,                      // [u16 delta = 0] -> tag 1 (phone)
+        0xe8, 0x03, 0x00, 0x00,          // [u32 count = 1000] (forged, no data)
+    };
+    hello::world::packet pb;
+    message<hello::world::packet>::decode(pb, buf, sizeof(buf));
+    assert(pb.phone.size() == 0);
+    printf("test_map_oom_defense ok\n");
+}
+
 int main() {
     test_pack();
     test_unpack();
     test_encoder();
     test_decoder();
+    test_array_oom_defense();
+    test_map_oom_defense();
     printf("ALL CODEC TESTS PASSED\n");
     return 0;
 }
