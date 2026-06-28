@@ -5,18 +5,20 @@
 #include <vector>
 #include <unordered_map>
 
-#include "zproto.hpp"
+extern "C" {
+#include "zproto.h"
+}
 
-// phase 2b: emit X.wire.hpp — a namespace-zproto block of wire<T> specializations
+// phase 2b: emit X.message.hpp — a namespace-zproto block of message<T> specializations
 // (one per struct). Each carries tag()/name() (tagged structs only), byte_size(),
 // write_at() (header + deltas + body, cursor-threaded into a pre-sized Buffer),
 // encode() (resize once + write_at), and decode() (schema-agnostic decoder switch,
-// recursing via wire<E>::decode for nested structs). No encoder object, no
+// recursing via message<E>::decode for nested structs). No encoder object, no
 // virtuals, no .cc — the data structs stay clean PODs defined in X.hpp.
 
 // fully-qualified C++ type name for each struct, e.g. "::bench::frame" or
 // "::hello::world::packet::phone". Always carries its full leading scope so it
-// resolves from inside namespace zproto, where wire<> lives.
+// resolves from inside namespace zproto, where message<> lives.
 static std::unordered_map<struct zproto_struct *, std::string> qname;
 // "::ns1::ns2::" prefix (or "::" when the schema has no namespace).
 static std::string qualprefix;
@@ -163,8 +165,8 @@ dcast(int type)
 // ---- qualified-name collection --------------------------------------------
 // post-order DFS over the struct tree: records every struct's full type so a
 // field referencing struct E resolves regardless of where E sits. Emission
-// (dump_struct) uses the same post-order, so wire<E> is always defined before
-// any wire<X> that names it as a field type (required: wire<concrete-type> is a
+// (dump_struct) uses the same post-order, so message<E> is always defined before
+// any message<X> that names it as a field type (required: message<concrete-type> is a
 // non-dependent name, so the specialization must be complete at that point).
 
 static void
@@ -190,16 +192,16 @@ byte_size_stmt(struct zproto_field *f)
 	if (f->mapkey) {                                  // struct map: array of values
 		snprintf(b, sizeof(b),
 			"\t\tn += 4;\n"
-			"\t\tfor (const auto &kv : o.%s) n += wire<%s>::byte_size(kv.second);\n",
+			"\t\tfor (const auto &kv : o.%s) n += message<%s>::byte_size(kv.second);\n",
 			fn, qname[f->seminfo].c_str());
 	} else if (f->type == ZPROTO_STRUCT && f->isarray) {
 		snprintf(b, sizeof(b),
 			"\t\tn += 4;\n"
-			"\t\tfor (const auto &v : o.%s) n += wire<%s>::byte_size(v);\n",
+			"\t\tfor (const auto &v : o.%s) n += message<%s>::byte_size(v);\n",
 			fn, qname[f->seminfo].c_str());
 	} else if (f->type == ZPROTO_STRUCT) {
 		snprintf(b, sizeof(b),
-			"\t\tn += wire<%s>::byte_size(o.%s);\n",
+			"\t\tn += message<%s>::byte_size(o.%s);\n",
 			qname[f->seminfo].c_str(), fn);
 	} else if ((f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) && f->isarray) {
 		snprintf(b, sizeof(b),
@@ -228,16 +230,16 @@ write_at_stmt(struct zproto_field *f)
 	if (f->mapkey) {
 		snprintf(b, sizeof(b),
 			"\t\tput_u32(b + cur, (uint32_t)o.%s.size()); cur += 4;\n"
-			"\t\tfor (const auto &kv : o.%s) cur = wire<%s>::write_at(kv.second, buf, cur);\n",
+			"\t\tfor (const auto &kv : o.%s) cur = message<%s>::write_at(kv.second, buf, cur);\n",
 			fn, fn, qname[f->seminfo].c_str());
 	} else if (f->type == ZPROTO_STRUCT && f->isarray) {
 		snprintf(b, sizeof(b),
 			"\t\tput_u32(b + cur, (uint32_t)o.%s.size()); cur += 4;\n"
-			"\t\tfor (const auto &v : o.%s) cur = wire<%s>::write_at(v, buf, cur);\n",
+			"\t\tfor (const auto &v : o.%s) cur = message<%s>::write_at(v, buf, cur);\n",
 			fn, fn, qname[f->seminfo].c_str());
 	} else if (f->type == ZPROTO_STRUCT) {
 		snprintf(b, sizeof(b),
-			"\t\tcur = wire<%s>::write_at(o.%s, buf, cur);\n",
+			"\t\tcur = message<%s>::write_at(o.%s, buf, cur);\n",
 			qname[f->seminfo].c_str(), fn);
 	} else if ((f->type == ZPROTO_STRING || f->type == ZPROTO_BLOB) && f->isarray) {
 		snprintf(b, sizeof(b),
@@ -273,7 +275,7 @@ write_at_stmt(struct zproto_field *f)
 	return b;
 }
 
-// ---- per-field decode case (switch shape; wire<E>::decode for nested) -----
+// ---- per-field decode case (switch shape; message<E>::decode for nested) ---
 
 static std::string
 decode_stmt(struct zproto_field *f)
@@ -288,7 +290,7 @@ decode_stmt(struct zproto_field *f)
 			"\t\t\t\tsize_t n;\n"
 			"\t\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
 			"\t\t\t\t%s t;\n"
-			"\t\t\t\twire<%s>::decode(t, p, n);\n"
+			"\t\t\t\tmessage<%s>::decode(t, p, n);\n"
 			"\t\t\t\to.%s[t.%s] = std::move(t);\n"
 			"\t\t\t}\n"
 			"\t\t\tbreak;\n"
@@ -303,7 +305,7 @@ decode_stmt(struct zproto_field *f)
 			"\t\t\tfor (uint32_t i = 0; i < c; i++) {\n"
 			"\t\t\t\tsize_t n;\n"
 			"\t\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
-			"\t\t\t\twire<%s>::decode(o.%s[i], p, n);\n"
+			"\t\t\t\tmessage<%s>::decode(o.%s[i], p, n);\n"
 			"\t\t\t}\n"
 			"\t\t\tbreak;\n"
 			"\t\t}\n",
@@ -313,7 +315,7 @@ decode_stmt(struct zproto_field *f)
 			"\t\tcase %d: {\n"
 			"\t\t\tsize_t n;\n"
 			"\t\t\tconst uint8_t *p = d.struct_bytes(n);\n"
-			"\t\t\twire<%s>::decode(o.%s, p, n);\n"
+			"\t\t\tmessage<%s>::decode(o.%s, p, n);\n"
 			"\t\t\tbreak;\n"
 			"\t\t}\n",
 			f->tag, qname[f->seminfo].c_str(), fn);
@@ -374,7 +376,7 @@ decode_stmt(struct zproto_field *f)
 	return b;
 }
 
-// emit one wire<T> specialization: tag/name (tagged structs only) + byte_size +
+// emit one message<T> specialization: tag/name (tagged structs only) + byte_size +
 // write_at + encode + decode.
 static void
 emit_struct(FILE *fp, struct zproto_struct *st)
@@ -393,7 +395,7 @@ emit_struct(FILE *fp, struct zproto_struct *st)
 	}
 	bool body_uses_o = (fc > 0);   // write_at / decode touch o on every field
 
-	fprintf(fp, "template<> struct wire<%s> {\n", Q.c_str());
+	fprintf(fp, "template<> struct message<%s> {\n", Q.c_str());
 	if (st->tag != 0) {
 		fprintf(fp, "\tstatic constexpr int tag() { return 0x%X; }\n", zproto_tag(st));
 		fprintf(fp, "\tstatic constexpr const char *name() { return \"%s\"; }\n", zproto_name(st));
@@ -452,7 +454,7 @@ emit_struct(FILE *fp, struct zproto_struct *st)
 }
 
 // emit every struct's specialization in post-order (children before parent),
-// matching header.cpp's nesting so a referenced wire<E> precedes wire<X>.
+// matching header.cpp's nesting so a referenced message<E> precedes message<X>.
 static void
 dump_struct(FILE *fp, struct zproto_struct *st)
 {
@@ -469,7 +471,7 @@ body(const char *name, std::vector<const char *> &space, const char * /*proto*/,
 {
 	FILE *fp;
 	std::string path = name;
-	path += ".wire.hpp";
+	path += ".message.hpp";
 	fp = fopen(path.c_str(), "wb+");
 	if (fp == NULL) {
 		perror(path.c_str());
@@ -496,7 +498,7 @@ body(const char *name, std::vector<const char *> &space, const char * /*proto*/,
 
 	fprintf(fp, "#pragma once\n");
 	fprintf(fp, "#include \"%s.hpp\"\n", name);
-	fprintf(fp, "#include \"zprotowire.hpp\"\n");
+	fprintf(fp, "#include \"zproto.hpp\"\n");
 	fprintf(fp, "#include <cstring>\n");
 	fprintf(fp, "#include <utility>\n");
 	fprintf(fp, "\n");

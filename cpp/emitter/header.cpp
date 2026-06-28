@@ -3,7 +3,9 @@
 #include <string>
 #include <unordered_set>
 
-#include "zproto.hpp"
+extern "C" {
+#include "zproto.h"
+}
 #include "header.h"
 
 static std::unordered_set<struct zproto_struct *> protocol;

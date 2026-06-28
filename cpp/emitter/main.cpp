@@ -7,7 +7,9 @@
 #include <string.h>
 #include <unordered_set>
 #include <sys/stat.h>
-#include "zproto.hpp"
+extern "C" {
+#include "zproto.h"
+}
 #include "header.h"
 #include "body.h"
 
@@ -83,7 +85,7 @@ int main(int argc, char *argv[])
 	err = zproto_parse(&parser, proto);
 	if (err < 0) {
 		fprintf(stderr, "%s", parser.error);
-		delete proto;
+		delete []proto;
 		return -1;
 	}
 	strip_ext(argv[1]);
