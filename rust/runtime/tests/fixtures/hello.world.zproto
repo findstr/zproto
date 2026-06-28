@@ -1,0 +1,20 @@
+player_level {
+	.userid:ulong 1
+	.level:uinteger 2
+}
+item {
+	.id:uinteger 1
+	.count:uinteger 2
+}
+packet 0xfe {
+	.userid:ulong 1
+	.name:string 2
+	.blob:blob 3
+	.items:item[] 4
+	.friends:player_level[userid] 5
+	.from:ulong 6
+	.type:string 7
+	.flags:boolean[] 8
+	.score:integer 9
+	.ratio:float 10
+}

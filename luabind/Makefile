@@ -15,7 +15,7 @@ linux:LDFLAG += -Wl,-E -lrt
 macosx:LDFLAG += -Wl,-no_compact_unwind
 linux macosx:LDFLAG += -lpthread
 
-linux:SHARED:=--share -fPIC
+linux:SHARED:=-shared -fPIC
 macosx:SHARED=-dynamiclib -fPIC -Wl,-undefined,dynamic_lookup
 
 linux macosx:test zproto.so rand.so
