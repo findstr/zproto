@@ -460,6 +460,8 @@ end
 local function testunpackdefend()
 	print("======start unpack defend===========")
 	io.stdout:write("\27[?25l")
+	local dat = proto:unpack("\xff")
+	assert(dat == nil, "unpack invalid xff")
 	for i = 1, testcount do
 		local dat = rand.rand(0)
 		proto:unpack(dat)
