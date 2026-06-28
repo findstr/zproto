@@ -1,0 +1,17 @@
+[package]
+name = "zproto"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "zproto"
+path = "src/lib.rs"
+
+[features]
+# Gate the generator integration test, which shells out to the C++ emitter.
+generator = []
+
+[[test]]
+name = "generator"
+path = "tests/generator.rs"
+required-features = ["generator"]

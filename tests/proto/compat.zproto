@@ -1,0 +1,49 @@
+# compat.zproto - schema for cross-language encode/decode compatibility tests.
+# Covers all recommended scalar types, edge values, arrays, sub-struct members,
+# and sparse fields (field id skip).
+# Only uses new-style type names; deprecated aliases (byte/short/integer/long)
+# are not tested.
+
+all_scalars {
+    .b:boolean 1
+    .i32:int32 2
+    .u32:uint32 3
+    .i64:int64 4
+    .u64:uint64 5
+    .f:float 6
+    .s:string 7
+    .bl:blob 8
+}
+
+edge_values {
+    .max_i64:int64 1
+    .min_i64:int64 2
+    .max_u64:uint64 3
+    .zero_u64:uint64 4
+    .empty_str:string 5
+    .empty_blob:blob 6
+    .max_f32:float 7
+    .min_f32:float 8
+    .neg_f32:float 9
+}
+
+arrays_test {
+    .ints:int32[] 1
+    .strs:string[] 2
+}
+
+inner {
+    .x:int32 1
+    .y:float 2
+}
+
+outer {
+    .val:inner 1
+    .name:string 2
+}
+
+sparse_fields {
+    .a:int32 1
+    .b:int32 3
+    .c:int32 5
+}
