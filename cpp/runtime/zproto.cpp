@@ -211,7 +211,9 @@ int pack(const uint8_t *src, int srcsz, Buffer &dst) {
 	// master's bound: pack emits <= srcsz + overhead (no pad), so no sz8 round-up.
 	assert(dst.data() == nullptr || src != (const uint8_t *)dst.data());
 	int needn = ((srcsz + 2047) / 2048) * 2 + srcsz + 1;
-	dst.resize((size_t)needn);
+	if (!dst.ensure((size_t)needn))       // OOM / cap exceeded (mirrors unpack)
+		return (int)errc::oom;
+	dst.set_size((size_t)needn);
 	int n = pack_impl(src, srcsz, (uint8_t *)dst.data());
 	dst.set_size((size_t)n);
 	return n;
