@@ -6,6 +6,15 @@
 #include <sys/stat.h>
 #include "zproto.h"
 
+/* host endianness: the wire format is little-endian. On LE hosts a native
+ * load/store (memcpy of N bytes) is a single mov; on BE hosts we fall back to
+ * the byte shift so the wire bytes stay correct everywhere. */
+#if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) || defined(_MSC_VER) || defined(_WIN32)
+#define ZPROTO_LE 1
+#else
+#define ZPROTO_LE 0
+#endif
+
 #define ARRAYSIZE(n)	(sizeof(n)/sizeof((n)[0]))
 #define TOKEN_SIZE	(64)
 #define TOKEN_STRING	(1)
@@ -870,6 +879,53 @@ queryfield(struct zproto_struct *st, int tag)
 	return NULL;
 }
 
+#if ZPROTO_LE
+static inline int
+marshal_uint16(uint8_t *buff, uint32_t v)
+{
+	uint16_t u = (uint16_t)v;
+	memcpy(buff, &u, 2);
+	return 2;
+}
+
+static inline int
+marshal_uint32(uint8_t *buff, uint32_t v)
+{
+	memcpy(buff, &v, 4);
+	return 4;
+}
+
+static inline int
+marshal_uint64(uint8_t *buff, uint64_t v)
+{
+	memcpy(buff, &v, 8);
+	return 8;
+}
+
+static inline uint32_t
+unmarshal_uint16(const uint8_t *buff)
+{
+	uint16_t v;
+	memcpy(&v, buff, 2);
+	return v;
+}
+
+static inline uint32_t
+unmarshal_uint32(const uint8_t *buff)
+{
+	uint32_t v;
+	memcpy(&v, buff, 4);
+	return v;
+}
+
+static inline uint64_t
+unmarshal_uint64(const uint8_t *buff)
+{
+	uint64_t v;
+	memcpy(&v, buff, 8);
+	return v;
+}
+#else
 static inline int
 marshal_uint16(uint8_t *buff, uint32_t v)
 {
@@ -923,6 +979,7 @@ unmarshal_uint64(const uint8_t *buff)
 	v |= unmarshal_uint32(buff);
 	return v;
 }
+#endif
 
 
 #define SIZEOF_TAG	2
@@ -1242,48 +1299,83 @@ zproto_decode(struct zproto_struct *st,
 //////////encode/decode
 //////////pack
 static int
-packseg(const uint8_t *src, int sn, uint8_t *dst, int dn)
+packseg(const uint8_t *src, int sn, uint8_t *dst)
 {
-	int i;
-	int pack_sz = 0;
-	uint8_t *hdr = dst++;
-	--dn;
-	assert(dn >= 0);
-	*hdr = 0;
+	uint8_t *hdr = dst;
+	uint8_t *out = dst + 1;
+	int pack_sz;
 	sn = sn < 8 ? sn : 8;
-	for (i = 0; i < sn; i++) {
-		if (src[i]) {
-			*hdr |= 1 << i;
-			*dst++ = src[i];
-			++pack_sz;
-			--dn;
+	if (sn == 8) {
+		uint64_t w;
+		memcpy(&w, src, 8);
+		if (w == 0) {            /* all-zero: zero header, no data */
+			*hdr = 0;
+			pack_sz = 0;
+		} else {
+			/* branchless 8-way scatter: store every byte, advance out only
+			 * for non-zeros. A store at a zero position is overwritten by
+			 * the next store, so the emitted bytes are exactly the non-zeros
+			 * in order. (src[i] != 0) compiles to a flag extract, no branch. */
+			uint8_t h = 0;
+			int nz;
+			nz = (src[0] != 0); h |= (uint8_t)(nz << 0); *out = src[0]; out += nz;
+			nz = (src[1] != 0); h |= (uint8_t)(nz << 1); *out = src[1]; out += nz;
+			nz = (src[2] != 0); h |= (uint8_t)(nz << 2); *out = src[2]; out += nz;
+			nz = (src[3] != 0); h |= (uint8_t)(nz << 3); *out = src[3]; out += nz;
+			nz = (src[4] != 0); h |= (uint8_t)(nz << 4); *out = src[4]; out += nz;
+			nz = (src[5] != 0); h |= (uint8_t)(nz << 5); *out = src[5]; out += nz;
+			nz = (src[6] != 0); h |= (uint8_t)(nz << 6); *out = src[6]; out += nz;
+			nz = (src[7] != 0); h |= (uint8_t)(nz << 7); *out = src[7]; out += nz;
+			*hdr = h;
+			pack_sz = (int)(out - (hdr + 1));
 		}
+	} else {
+		/* tail: fewer than 8 bytes remain -- conditional-store loop (uncommon) */
+		uint8_t h = 0;
+		int i;
+		pack_sz = 0;
+		for (i = 0; i < sn; i++) {
+			if (src[i]) {
+				h |= (uint8_t)(1 << i);
+				*out++ = src[i];
+				++pack_sz;
+			}
+		}
+		*hdr = h;
 	}
-	assert(dn >= 0);
 	return pack_sz;
 }
 
 static int
-packff(const uint8_t *src, int sn, uint8_t *dst, int dn)
+packff(const uint8_t *src, int sn, uint8_t *dst)
 {
-	int i;
-	int packsz = 0;
+	int packsz;
 	sn = sn < 8 ? sn : 8;
-	for (i = 0; i < sn; i++) {
-		if (src[i])
-			++packsz;
+	if (sn == 8) {                    /* one SWAR popcount replaces the count loop */
+		uint64_t w;
+		memcpy(&w, src, 8);
+		uint64_t z = (w - 0x0101010101010101ULL) & ~w & 0x8080808080808080ULL;
+		packsz = 8 - __builtin_popcountll(z);
+	} else {
+		int i;
+		packsz = 0;
+		for (i = 0; i < sn; i++)
+			if (src[i])
+				++packsz;
 	}
 	if (packsz >= 6) {	//6, 7, 8
-		assert(dn >= sn);
+		// emit a full 8-byte segment (zero-pad to 8) so a run is a contiguous
+		// 8*ffn block -- unpack bulk-memcpys it (no partial-tail special case)
 		memcpy(dst, src, sn);
-		packsz = sn;
+		memset(dst + sn, 0, 8 - sn);
+		packsz = 8;
 	}
 	return packsz;
 }
 
 
 static int
-pack(const uint8_t *src, int sn, uint8_t *dst, int dn)
+pack(const uint8_t *src, int sn, uint8_t *dst)
 {
 	int packsz;
 	uint8_t *ffn = NULL;
@@ -1291,27 +1383,24 @@ pack(const uint8_t *src, int sn, uint8_t *dst, int dn)
 	packsz = -1;
 	while (sn > 0) {
 		if (packsz != 8) {  //pack segment
-			packsz = packseg(src, sn, dst, dn);
+			packsz = packseg(src, sn, dst);
 			src += 8;
 			sn -= 8;
 			dst += packsz + 1;	//skip the data+header
-			dn -= packsz + 1;
 			if (packsz == 8 && sn > 0) {   //it's 0xff
 				ffn = dst;
 				++dst;
-				--dn;
 			} else {
 				ffn = NULL;
 			}
 		} else if (packsz == 8) {
 			*ffn = 0;
 			for (;;) {
-				packsz = packff(src, sn, dst, dn);
+				packsz = packff(src, sn, dst);
 				if (packsz >= 6 && packsz <= 8) {//6,7,8
 					src += 8;
 					sn -= 8;
 					dst += packsz;
-					dn -= packsz;
 					++(*ffn);
 					if (*ffn == 255) {
 						ffn = NULL;
@@ -1330,40 +1419,35 @@ pack(const uint8_t *src, int sn, uint8_t *dst, int dn)
 static int
 unpackseg(const uint8_t *src, int sn, uint8_t *dst, int dn)
 {
-	uint8_t hdr;
-	const uint8_t *end;
-	int unpacksz = 0;
-	sn = sn < 9 ? sn : 9;//header + data
 	if (dn < 8)
 		return ZPROTO_OOM;
-	end = src + sn;
-	hdr = *src++;
+	uint8_t hdr = *src++;
+	const uint8_t *data0 = src;
 	if (hdr == 0) {
 		memset(dst, 0, 8);
-	} else {
+	} else if (sn >= 10) {       /* >=10 bytes remain, so a byte follows this
+	                             * segment's data: the branchless read (which
+	                             * touches one byte past on trailing clear bits)
+	                             * stays inside the caller's buffer. */
 		int i;
 		for (i = 0; i < 8; i++) {
-			if (hdr & 0x01 && src != end) { //defend invalid data
+			uint8_t bit = hdr & 1;
+			hdr >>= 1;
+			*dst++ = (uint8_t)((0 - bit) & *src);
+			src += bit;
+		}
+	} else {                     /* <=9 bytes remain: bounded expand, no over-read */
+		const uint8_t *end = data0 + (sn - 1);
+		int i;
+		for (i = 0; i < 8; i++) {
+			if ((hdr & 1) && src < end)
 				*dst++ = *src++;
-				unpacksz++;
-			} else {
+			else
 				*dst++ = 0;
-			}
 			hdr >>= 1;
 		}
 	}
-	return unpacksz;
-}
-
-static int
-unpackff(const uint8_t *src, int sn, uint8_t *dst, int dn)
-{
-	if (dn < 8)
-		return ZPROTO_OOM;
-	sn = sn < 8 ? sn : 8;
-	memcpy(dst, src, sn);
-	memset(&dst[sn], 0, 8 - sn);
-	return sn;
+	return (int)(src - data0);
 }
 
 static int
@@ -1387,20 +1471,16 @@ unpack(const uint8_t *src, int sn, uint8_t *dst, int dn)
 				--sn;
 			}
 		} else if (unpacksz == 8) {
-			int i;
-			int n;
-			//ffn - 1, because the last ff pack size may 6, 7, 8
-			if ((ffn - 1) * 8 > sn)
+			//every run segment is a full 8 bytes now (packff pads), so the
+			//whole run is one contiguous memcpy -- no per-segment loop
+			int run = 8 * ffn;
+			if (run > sn || run > dn)
 				return ZPROTO_ERROR;
-			for (i = 0; i < ffn; i++) {
-				n = unpackff(src, sn, dst, dn);
-				if (n < 0)
-					return n;
-				src += n;
-				sn -= n;
-				dst += 8;
-				dn -= 8;
-			}
+			memcpy(dst, src, (size_t)run);
+			src += run;
+			sn -= run;
+			dst += run;
+			dn -= run;
 			unpacksz = -1; //restart unpack
 		}
 	}
@@ -1412,10 +1492,13 @@ zproto_pack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
 {
 	//origin data:0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x9
 	//packed data:0xff,0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x0,0x1,0x9
-	int needn = ((srcsz + 2047) / 2048) * 2 + srcsz + 1;
+	/* round srcsz up to a whole 8-byte segment first: packff zero-pads the
+	 * trailing partial segment to 8, so the output is bounded by the rounded size */
+	int sz8 = (srcsz + 7) & ~7;
+	int needn = ((sz8 + 2047) / 2048) * 2 + sz8 + 1;
 	if (dstsz < needn)
 		return ZPROTO_OOM;
-	return pack(src, srcsz, dst, dstsz);
+	return pack(src, srcsz, dst);
 }
 
 int

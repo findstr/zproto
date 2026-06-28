@@ -98,7 +98,8 @@ int main(void) {
 	fprintf(fp, "%zu\n", ps.size());
 	for (auto &p : ps) {
 		int n = (int)p.bytes.size();
-		int needn = (((n + 2047) / 2048) * 2) + n + 1;
+		int n8 = (n + 7) & ~7;   // packff pads the trailing partial segment to 8
+		int needn = (((n8 + 2047) / 2048) * 2) + n8 + 1;
 		std::vector<uint8_t> out(needn, 0);
 		int psz = zproto_pack(p.bytes.data(), n, out.data(), needn);
 		fprintf(fp, "%s\n", to_hex(p.bytes.data(), n).c_str());
