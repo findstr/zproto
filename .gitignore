@@ -33,8 +33,11 @@
 zproto
 luabind/lua53
 luabind/test
-cppbind/test
-cppbind/*.hpp
-!cppbind/zprotowire.hpp
-cppbind/*.cc
+# C++ build artifacts
+cpp/emitter/zproto
+cpp/emitter/zproto_c.o
+cpp/tests/test
+cpp/tests/test_codec
+cpp/tests/hello_world.hpp
+cpp/tests/hello_world.message.hpp
 csbind/hello_world.cs
