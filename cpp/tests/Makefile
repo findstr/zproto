@@ -8,7 +8,11 @@ GENERATED=hello_world.hpp hello_world.message.hpp
 # default: build generator, generate code, build both test binaries
 all: test test_codec
 
-$(GEN):
+# track emitter sources (and the C parser) so editing them forces an emitter
+# rebuild -- otherwise a stale generator silently emits outdated code.
+EMITTER_SRCS=../emitter/main.cpp ../emitter/header.cpp ../emitter/body.cpp \
+	     ../emitter/header.h ../emitter/body.h ../../zproto.c
+$(GEN): $(EMITTER_SRCS)
 	$(MAKE) -C ../emitter
 
 $(GENERATED): $(GEN) $(SCHEMA)
