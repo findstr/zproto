@@ -1,10 +1,14 @@
+#include "hello_world.hpp"
+#include "hello_world.message.hpp"
+#include "zproto.hpp"
 #include <assert.h>
 #include <stdio.h>
 #include <string>
 #include <vector>
 #include <pthread.h>
 #include <unordered_set>
-#include "hello_world.hpp"
+
+using namespace zproto;
 
 static hello::world::packet pk;
 
@@ -88,39 +92,40 @@ assert_struct(const hello::world::packet &a, const hello::world::packet &b)
 static void
 test_normal()
 {
-	std::string dat;
-	std::string cook, tmp;
+	Buffer dat, cook, tmp, up;
 	hello::world::packet pk2;
-	hello::world::packet pk3;
 	hello::world::packet clr;
-	int sz = pk._encode(dat);
-	printf("tag:%x\n", pk._tag());
-	printf("encode1 size:%d\n", sz);
-	print_hex((uint8_t *)dat.c_str(), dat.size());
-	sz = pk._pack((uint8_t *)dat.c_str(), dat.size(), cook);
-	printf("pack1 size:%d\n", sz);
-	print_hex((uint8_t *)cook.c_str(), cook.size());
-	//
-	sz = pk._encode(tmp);
-	printf("encode2 size:%d\n", sz);
-	print_hex((uint8_t *)tmp.c_str(), tmp.size());
-	sz = pk._pack((uint8_t *)tmp.c_str(), tmp.size(), cook);
-	printf("pack2 size:%d\n", sz);
-	print_hex((uint8_t *)cook.c_str(), cook.size());
-	//
-	dat.clear();
-	pk2._unpack((uint8_t *)cook.c_str(), cook.size(), dat);
-	sz = pk2._decode((const uint8_t *)dat.data(), dat.size());
-	printf("decode1 size:%d\n", sz);
+
+	message<hello::world::packet>::encode(pk, dat);
+	printf("tag:%x\n", message<hello::world::packet>::tag());
+	printf("encode1 size:%zu\n", dat.size());
+	print_hex((uint8_t *)dat.data(), dat.size());
+
+	pack((const uint8_t *)dat.data(), (int)dat.size(), cook);
+	printf("pack1 size:%zu\n", cook.size());
+	print_hex((uint8_t *)cook.data(), cook.size());
+
+	message<hello::world::packet>::encode(pk, tmp);
+	printf("encode2 size:%zu\n", tmp.size());
+	print_hex((uint8_t *)tmp.data(), tmp.size());
+
+	// unpack -> decode (round 1)
+	up.clear();
+	unpack((const uint8_t *)cook.data(), (int)cook.size(), up);
+	message<hello::world::packet>::decode(pk2, (const uint8_t *)up.data(), up.size());
 	print_struct(pk2);
 	assert_struct(pk2, pk);
-	//
-	pk3._unpack((uint8_t *)cook.c_str(), cook.size(), tmp);
-	sz = pk3._decode((const uint8_t *)tmp.data(), tmp.size());
-	printf("decode2 size:%d\n", sz);
+
+	// unpack -> decode (round 2, fresh buffer)
+	Buffer up2;
+	unpack((const uint8_t *)cook.data(), (int)cook.size(), up2);
+	hello::world::packet pk3;
+	message<hello::world::packet>::decode(pk3, (const uint8_t *)up2.data(), up2.size());
 	print_struct(pk3);
 	assert_struct(pk3, pk);
-	pk3._reset();
+
+	// reset == assign a default-constructed POD (no _reset() in the new API)
+	pk3 = clr;
 	assert_struct(pk3, clr);
 }
 
@@ -130,14 +135,15 @@ test_thread(void *)
 	int i;
 	hello::world::packet pkk = pk;
 	pkk.phone[1].home = 0x3389 + rand() % 10;
-	pkk.phone[1].work = 999.98 + rand() % 10;
-	std::string pk_dat;
-	pkk._encode(pk_dat);
+	pkk.phone[1].work = 999.98f + rand() % 10;
+	Buffer pk_dat;
+	message<hello::world::packet>::encode(pkk, pk_dat);
 	for (i = 0; i < 100; i++) {
-		std::string out;
-		pkk._encode(out);
-		if (out != pk_dat)
-			printf("[multithread] _encode memory corrupt\n");
+		Buffer out;
+		message<hello::world::packet>::encode(pkk, out);
+		if (out.size() != pk_dat.size() ||
+			memcmp(out.data(), pk_dat.data(), out.size()) != 0)
+			printf("[multithread] encode output differs\n");
 	}
 	return NULL;
 }
