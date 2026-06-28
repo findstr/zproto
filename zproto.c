@@ -1351,11 +1351,11 @@ packff(const uint8_t *src, int sn, uint8_t *dst)
 {
 	int packsz;
 	sn = sn < 8 ? sn : 8;
-	if (sn == 8) {                    /* one SWAR popcount replaces the count loop */
-		uint64_t w;
-		memcpy(&w, src, 8);
-		uint64_t z = (w - 0x0101010101010101ULL) & ~w & 0x8080808080808080ULL;
-		packsz = 8 - __builtin_popcountll(z);
+	if (sn == 8) { /* unrolled per-byte count: correct (the SWAR hasZero trick
+		              has borrow-chain false positives that miscount) and faster
+		              (independent checks beat the SWAR dependency chain) */
+		packsz = (src[0]!=0)+(src[1]!=0)+(src[2]!=0)+(src[3]!=0)
+		       + (src[4]!=0)+(src[5]!=0)+(src[6]!=0)+(src[7]!=0);
 	} else {
 		int i;
 		packsz = 0;
@@ -1363,12 +1363,9 @@ packff(const uint8_t *src, int sn, uint8_t *dst)
 			if (src[i])
 				++packsz;
 	}
-	if (packsz >= 6) {	//6, 7, 8
-		// emit a full 8-byte segment (zero-pad to 8) so a run is a contiguous
-		// 8*ffn block -- unpack bulk-memcpys it (no partial-tail special case)
+	if (packsz >= 6) { //6, 7, 8
 		memcpy(dst, src, sn);
-		memset(dst + sn, 0, 8 - sn);
-		packsz = 8;
+		packsz = sn;
 	}
 	return packsz;
 }
@@ -1382,12 +1379,12 @@ pack(const uint8_t *src, int sn, uint8_t *dst)
 	uint8_t *dstart = dst;
 	packsz = -1;
 	while (sn > 0) {
-		if (packsz != 8) {  //pack segment
+		if (packsz != 8) { //pack segment
 			packsz = packseg(src, sn, dst);
 			src += 8;
 			sn -= 8;
-			dst += packsz + 1;	//skip the data+header
-			if (packsz == 8 && sn > 0) {   //it's 0xff
+			dst += packsz + 1; //skip the data+header
+			if (packsz == 8 && sn > 0) { //it's 0xff
 				ffn = dst;
 				++dst;
 			} else {
@@ -1397,7 +1394,7 @@ pack(const uint8_t *src, int sn, uint8_t *dst)
 			*ffn = 0;
 			for (;;) {
 				packsz = packff(src, sn, dst);
-				if (packsz >= 6 && packsz <= 8) {//6,7,8
+				if (packsz >= 6 && packsz <= 8) {
 					src += 8;
 					sn -= 8;
 					dst += packsz;
@@ -1425,10 +1422,11 @@ unpackseg(const uint8_t *src, int sn, uint8_t *dst, int dn)
 	const uint8_t *data0 = src;
 	if (hdr == 0) {
 		memset(dst, 0, 8);
-	} else if (sn >= 10) {       /* >=10 bytes remain, so a byte follows this
-	                             * segment's data: the branchless read (which
-	                             * touches one byte past on trailing clear bits)
-	                             * stays inside the caller's buffer. */
+	} else if (sn >= 10) {
+		/* >=10 bytes remain, so a byte follows this
+		* segment's data: the branchless read (which
+		* touches one byte past on trailing clear bits)
+		* stays inside the caller's buffer. */
 		int i;
 		for (i = 0; i < 8; i++) {
 			uint8_t bit = hdr & 1;
@@ -1437,8 +1435,8 @@ unpackseg(const uint8_t *src, int sn, uint8_t *dst, int dn)
 			src += bit;
 		}
 	} else {                     /* <=9 bytes remain: bounded expand, no over-read */
-		const uint8_t *end = data0 + (sn - 1);
 		int i;
+		const uint8_t *end = data0 + (sn - 1);
 		for (i = 0; i < 8; i++) {
 			if ((hdr & 1) && src < end)
 				*dst++ = *src++;
@@ -1471,14 +1469,19 @@ unpack(const uint8_t *src, int sn, uint8_t *dst, int dn)
 				--sn;
 			}
 		} else if (unpacksz == 8) {
-			//every run segment is a full 8 bytes now (packff pads), so the
-			//whole run is one contiguous memcpy -- no per-segment loop
 			int run = 8 * ffn;
-			if (run > sn || run > dn)
+			int copy;
+			//ffn - 1, because the last ff pack size may 6, 7, 8
+			if ((ffn - 1) * 8 > sn)
 				return ZPROTO_ERROR;
-			memcpy(dst, src, (size_t)run);
-			src += run;
-			sn -= run;
+			if (run > dn)
+				return ZPROTO_OOM;
+			copy = run < sn ? run : sn;
+			memcpy(dst, src, (size_t)copy);
+			if (copy < run)
+				memset(dst + copy, 0, (size_t)(run - copy));
+			src += copy;
+			sn -= copy;
 			dst += run;
 			dn -= run;
 			unpacksz = -1; //restart unpack
@@ -1492,10 +1495,7 @@ zproto_pack(const uint8_t *src, int srcsz, uint8_t *dst, int dstsz)
 {
 	//origin data:0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x9
 	//packed data:0xff,0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,0x0,0x1,0x9
-	/* round srcsz up to a whole 8-byte segment first: packff zero-pads the
-	 * trailing partial segment to 8, so the output is bounded by the rounded size */
-	int sz8 = (srcsz + 7) & ~7;
-	int needn = ((sz8 + 2047) / 2048) * 2 + sz8 + 1;
+	int needn = ((srcsz + 2047) / 2048) * 2 + srcsz + 1;
 	if (dstsz < needn)
 		return ZPROTO_OOM;
 	return pack(src, srcsz, dst);
@@ -1558,4 +1558,3 @@ zproto_dump(struct zproto *z)
 		dump_struct(root->buf[i], 0);
 	return ;
 }
-
